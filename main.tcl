@@ -1,5 +1,7 @@
 #!/usr/bin/env wish
 package require tooltip
+package require msgcat
+namespace import msgcat::*
 namespace import tooltip::tooltip
 ##nagelfar syntax tooltip x*
 
@@ -190,3 +192,47 @@ wm title . "Nexo SCAP (tk)"
 wm minsize . [expr {int(550 * 1.0)}] [expr {int(550 * 1.0)}]
 wm deiconify .
 raise .
+
+mcset en none "None"
+mcset pl none "Żaden"
+mcset fr none "Aucune"
+mcset de none "Keiner"
+mcset en payment "Sale"
+mcset pl payment "Sprzedaż"
+mcset fr payment "Vente"
+mcset de payment "Verkauf"
+mcset en refund "Refund"
+mcset pl refund "Zwrot"
+mcset fr refund "Rembourser"
+mcset de refund "Rückerstattung"
+mcset en cancellation "Cancellation"
+mcset pl cancellation "Unieważnienie"
+mcset fr cancellation "Annulation"
+mcset de cancellation "Stornierung"
+mcset en preauth "Pre-Authorisation"
+mcset pl preauth "Preautoryzacja"
+mcset fr preauth "Pré-autorisation"
+mcset de preauth "Vorautorisierung"
+mcset en updatePreauth "Update Pre-Auth."
+mcset pl updatePreauth "Zaktualizuj preautoryzację"
+mcset fr updatePreauth "Mettre à jour la pré-autorisation"
+mcset de updatePreauth "Vorautorisierung aktualisieren"
+mcset pl deferredPaymentCompletion "Zakończenie odroczonej płatności"
+mcset fr deferredPaymentCompletion "Achèvement du paiement différé"
+mcset de deferredPaymentCompletion "Abschluss der Zahlungsaufschub"
+mcset en voiceAuthorisation "Voice Auth."
+mcset pl voiceAuthorisation "Autoryzacja głosowa"
+mcset fr voiceAuthorisation "Autorisation vocale"
+mcset de voiceAuthorisation "Sprachautorisierung"
+mcset en cardholderDetection "Cardholder Detection"
+mcset pl cardholderDetection "Wykrywanie posiadacza karty"
+mcset fr cardholderDetection "Détection des titulaires de carte"
+mcset de cardholderDetection "Karteninhabererkennung"
+mcset en cardValidityCheck "Card Validity Check"
+mcset pl cardValidityCheck "Sprawdzanie ważności karty"
+mcset fr cardValidityCheck "Vérification de la validité de la carte"
+mcset de cardValidityCheck "Überprüfung der Kartengültigkeit"
+mcset en noShow "No-show"
+mcset pl noShow "Brak pokazu"
+mcset fr noShow "Non-présentation"
+mcset de noShow "No-show"
