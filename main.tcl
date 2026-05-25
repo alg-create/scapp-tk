@@ -1,0 +1,192 @@
+#!/usr/bin/env wish
+package require tooltip
+namespace import tooltip::tooltip
+##nagelfar syntax tooltip x*
+
+namespace eval ui {
+    set pending_events [list]
+    set pending_event_last 0
+    array set langlist {
+        English en
+        German de
+        French fr
+        Polish pl
+    }
+    array set evts {
+        "Language Selection" ui::build_language_selection
+        "Service Selection" ui::build_service_selection
+        "Manual Entry" ui::build_manual_entry
+        "Amount Entry" ui::build_amount_entry
+    }
+    set services [list "Card Validity Check" "Payment" "Refund" "Cancellation"]
+    array set pans {
+        Visa          4485936516057131
+        "Visa E."     4917505187608015
+        MasterCard    5144061495831024
+        Maestro       5038218334590356
+        Discover      6011978759425573
+        "Diners Club" 30588293701510
+        JCB           3537208456619863956
+        AmEx          375493854861485
+    }
+}
+
+proc ui::flashcard {base title} {
+    incr ui::pending_event_last
+    set path [ttk::labelframe $base.f$ui::pending_event_last]
+    set hdr [ttk::frame $path.header]
+    grid [ttk::button $hdr.close -style Close.Toolbutton -takefocus 0 \
+        -text "×" \
+        -command "destroy $path"
+    ] -row 0 -column 0 -sticky w
+    grid [ttk::label $hdr.title -text $title] -row 0 -column 1 -sticky w
+    grid columnconfigure $hdr 1 -weight 1
+    $path configure -labelwidget $hdr
+    tooltip $hdr.close "Remove event"
+    lappend ui::pending_events $path
+    return $path
+}
+
+proc ui::update_langiso {path} {
+    set ui::langiso($path) $ui::langlist($ui::langname($path))
+}
+
+proc ui::language_selection_cleanup {path} {
+    unset ui::langiso($path)
+    unset ui::langname($path)
+}
+
+proc ui::build_language_selection {path} {
+    variable langlist
+    set desc [ttk::label $path.lbl -text "ISO 639-1 code"]
+    set lang [ttk::combobox $path.sel -values [array names langlist] -state readonly -textvariable ui::langname($path)]
+    set code [ttk::entry $path.code -width 2 -state readonly -textvariable ui::langiso($path)]
+
+    grid $desc -row 0 -column 0
+    grid $lang -row 1 -column 0
+    grid $code -row 1 -column 1
+
+    bind $lang <<ComboboxSelected>> "ui::update_langiso $path"
+    bind $path <<Destroy>> "ui::language_selection_cleanup $path"
+
+    $lang current 0
+    ui::update_langiso $path
+    return $path
+}
+
+proc ui::build_amount_entry {path} {
+    grid [ttk::label $path.lamount -text "Amount: *"] -sticky w
+    grid [ttk::entry $path.eamount]
+    grid [ttk::label $path.lsupp -text "Supplementary (tip/gratuity):"] -sticky w
+    grid [ttk::entry $path.esupp]
+    grid [ttk::label $path.lcashback -text "Cashback:"] -sticky w
+    grid [ttk::entry $path.ecashback]
+    return $path
+}
+
+proc ui::build_service_selection {path} {
+    grid [ttk::combobox $path.service -values $ui::services -state readonly]
+    return $path
+}
+
+proc ui::update_pan {path} {
+    set ui::pan($path) $ui::pans($ui::brand($path))
+}
+
+proc ui::reset_brand {n1 n2 op} {
+    variable pans
+    foreach brand [array names pans] {
+        if {$ui::pan($n2) eq $ui::pans($brand)} {
+            set ui::brand($n2) $brand
+            return
+        }
+    }
+    set ui::brand($n2) ""
+}
+
+proc ui::build_manual_entry {path} {
+    variable pans
+    set months [list 01 02 03 04 05 06 07 08 09 10 11 12]
+    set years  [list 25 26 27 28 29 30]
+    ttk::combobox $path.dummy -values [array names pans] -state readonly -textvariable ui::brand($path)
+    grid [ttk::label $path.lpan -text "PAN: *"]                 -row 0 -column 0 -sticky w
+    grid [ttk::label $path.ldummy -text "or test:"]             -row 0 -column 1 -sticky w
+    grid [ttk::entry $path.epan -textvariable ui::pan($path)]   -row 1 -column 0 -sticky we
+    grid $path.dummy                                            -row 1 -column 1
+    grid [ttk::labelframe $path.expiry -text "Expiration Date"] -row 2 -columnspan 2
+    grid [ttk::label $path.expiry.lyear -text "Year: *"]        -row 3 -column 0 -sticky w
+    grid [ttk::combobox $path.expiry.eyear -values $years]      -row 4 -column 0
+    grid [ttk::label $path.expiry.lmonth -text "Month: *"]      -row 3 -column 1 -sticky w
+    grid [ttk::combobox $path.expiry.emonth -values $months]    -row 4 -column 1
+
+    bind $path.dummy <<ComboboxSelected>> "ui::update_pan $path"
+    trace add variable ui::pan($path) write ui::reset_brand
+    return $path
+}
+
+proc ui::build {} {
+    variable evts
+    ttk::frame .r
+    set menubar [ttk::frame .r.top]
+    set hamburger [ttk::button $menubar.hamburger -text "\u2630" -width 2]
+    set main [ttk::panedwindow .r.p -orient horizontal]
+    set right [ttk::frame $main.r]
+    set left  [ttk::frame $main.l]
+
+    $main add $left -weight 1
+    $main add $right -weight 1
+
+    ttk::label $left.lbl -text "Notification"
+    ttk::button $left.clear -text "Clear ⎚" -command {
+        foreach path $ui::pending_events {
+            destroy $path
+        }
+    }
+    ttk::button $left.send -text "Send ⇨"
+    ttk::combobox $left.event_selector -values [array names evts] -state readonly -textvariable ui::selected_event
+    ttk::button $left.push -text "Add ⇩" -command {
+        grid [$ui::evts($ui::selected_event) [ui::flashcard .r.p.l $ui::selected_event]] -columnspan 3
+    }
+    set screen [text $right.screen -bg "black" -fg "#33ff33" -insertbackground "#33ff33" -font {courier 12 bold} -width 32 -height 3]
+
+    $left.event_selector current 0
+    $screen configure -state disabled
+
+    grid .r                   -column 0 -row 0 -sticky nwes
+    grid $menubar             -column 0 -row 0 -sticky we
+    grid $hamburger           -column 0 -row 0
+    grid $main                -column 0 -row 1 -sticky nwes
+    grid $left.lbl            -column 0 -row 2
+    grid $left.send           -column 2 -row 2
+    grid $left.push           -column 1 -row 3
+    grid $left.clear          -column 2 -row 3
+    grid $left.event_selector -column 0 -row 3
+    grid $screen              -column 1 -row 2
+
+    grid rowconfigure    $main 1 -weight 1
+    grid columnconfigure $main 0 -weight 1
+}
+
+proc handle_exit {} {
+    exit
+}
+
+#ttk::style theme use clam
+ttk::style configure Close.Toolbutton -foreground #cc0000 -padding 1
+ttk::style map Close.Toolbutton -foreground {active #ff0000}
+ttk::style configure TLabel -padding 4
+ttk::style configure TButton -padding 4
+#ttk::style configure TFrame -background #3f3f3f
+
+ui::build
+
+bind all <Key-Escape> {handle_exit; break}
+bind . <F5> {
+    catch {destroy .r}
+    source main.tcl
+}
+
+wm title . "Nexo SCAP (tk)"
+wm minsize . [expr {int(550 * 1.0)}] [expr {int(550 * 1.0)}]
+wm deiconify .
+raise .
