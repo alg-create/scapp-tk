@@ -128,12 +128,11 @@ proc ui::build_manual_entry {path} {
 
 proc ui::build {} {
     variable evts
-    ttk::frame .r
-    set menubar [ttk::frame .r.top]
+    set menubar [ttk::frame .top]
     set hamburger [ttk::button $menubar.hamburger -text "\u2630" -width 2]
-    set main [ttk::panedwindow .r.p -orient horizontal]
-    set right [ttk::frame $main.r]
+    set main [ttk::panedwindow .p -orient horizontal]
     set left  [ttk::frame $main.l]
+    set right [ttk::frame $main.r]
 
     $main add $left -weight 1
     $main add $right -weight 1
@@ -144,29 +143,47 @@ proc ui::build {} {
             destroy $path
         }
     }
+
+    ttk::frame $left.f
+    canvas $left.f.c -yscrollcommand "[ttk::scrollbar $left.f.vscroll -orient vertical -command "$left.f.c yview"] set"
+    set ::winId [$left.f.c create window 0 0 -window [ttk::frame $left.f.c.events] -anchor nw]
+    bind $left.f.c <Configure> {
+        .p.l.f.c itemconfigure $::winId -width %w
+    }
+
     ttk::button $left.send -text "Send ⇨"
     ttk::combobox $left.event_selector -values [array names evts] -state readonly -textvariable ui::selected_event
     ttk::button $left.push -text "Add ⇩" -command {
-        grid [$ui::evts($ui::selected_event) [ui::flashcard .r.p.l $ui::selected_event]] -columnspan 3
+        grid [$ui::evts($ui::selected_event) [ui::flashcard .p.l.f.c.events $ui::selected_event]]
     }
+
     set screen [text $right.screen -bg "black" -fg "#33ff33" -insertbackground "#33ff33" -font {courier 12 bold} -width 32 -height 3]
 
     $left.event_selector current 0
     $screen configure -state disabled
 
-    grid .r                   -column 0 -row 0 -sticky nwes
-    grid $menubar             -column 0 -row 0 -sticky we
+    grid $menubar             -column 0 -row 0 -sticky nwe
     grid $hamburger           -column 0 -row 0
     grid $main                -column 0 -row 1 -sticky nwes
-    grid $left.lbl            -column 0 -row 2
-    grid $left.send           -column 2 -row 2
-    grid $left.push           -column 1 -row 3
-    grid $left.clear          -column 2 -row 3
-    grid $left.event_selector -column 0 -row 3
+
+    grid $left.lbl            -column 0 -row 1
+    grid $left.push           -column 1 -row 2
+    grid $left.send           -column 2 -row 1
+    grid $left.clear          -column 2 -row 2
+    grid $left.event_selector -column 0 -row 2
+    grid $left.f              -column 0 -row 3 -sticky nsew -columnspan 3
     grid $screen              -column 1 -row 2
 
-    grid rowconfigure    $main 1 -weight 1
-    grid columnconfigure $main 0 -weight 1
+    grid $left.f.vscroll      -column 0 -row 0 -sticky nsw
+    grid $left.f.c            -column 1 -row 0 -sticky nswe
+
+    grid columnconfigure .       0 -weight 1
+    grid rowconfigure    .top    0 -weight 0
+    grid rowconfigure    .p      0 -weight 1
+    grid columnconfigure  $left.f 1 -weight 1
+    grid columnconfigure  $left.f 0 -weight 0
+
+    grid columnconfigure $left 0 -weight 1
 }
 
 proc handle_exit {} {
@@ -184,7 +201,7 @@ ui::build
 
 bind all <Key-Escape> {handle_exit; break}
 bind . <F5> {
-    catch {destroy .r}
+    catch {destroy .p .top}
     source main.tcl
 }
 
