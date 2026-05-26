@@ -191,7 +191,11 @@ proc ui::build {} {
         ui::update_scrollable_area .p.l.f.c
     }
 
-    ttk::button $left.send -text "Send ⇨"
+    ttk::button $left.send -text "Send ⇨" -command {
+        foreach path $ui::pending_events {
+            puts $path
+        }
+    }
     ttk::combobox $left.event_selector -values [array names evts] -state readonly -textvariable ui::selected_event
     ttk::button $left.push -text "Add ⇩" -command {
         grid [$ui::evts($ui::selected_event) [ui::flashcard .p.l.f.c.events $ui::selected_event]]
