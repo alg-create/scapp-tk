@@ -169,6 +169,15 @@ proc ui::update_scrollable_area {path} {
     $path configure -scrollregion [$path bbox all]
 }
 
+proc ui::append_log {logarea subsystem method msg} {
+    set numlines [lindex [split [$logarea index "end - 1 line"] "."] 0]
+    $logarea configure -state normal
+    if {$numlines==24} {$logarea delete 1.0 2.0}
+    if {[$logarea index "end-1c"]!="1.0"} {$logarea insert end "\n"}
+    $logarea insert end "[clock format [clock seconds] -format "%H:%M:%S"]\t$subsystem\t$method\t$msg"
+    $logarea configure -state disabled
+}
+
 proc ui::build {} {
     variable evts
     set menubar [ttk::frame .top]
@@ -214,6 +223,8 @@ proc ui::build {} {
     $screen tag configure .ce -justify center
     $screen insert end "Welcome\n" .ce
     $screen configure -state disabled
+    set logarea [text $right.logs -wrap char -width 24]
+    ui::append_log $logarea scap output "Welcome"
 
     $left.event_selector current 0
 
@@ -228,6 +239,7 @@ proc ui::build {} {
     grid $left.event_selector -column 0 -row 2
     grid $left.f              -column 0 -row 3 -sticky nsew -columnspan 3
     grid $screen              -column 0 -row 0
+    grid $logarea             -column 0 -row 1 -stick nsew
 
     grid $left.f.c            -column 1 -row 0 -sticky nswe
 
@@ -244,6 +256,10 @@ proc ui::build {} {
     grid columnconfigure $left.f 1 -weight 1
     grid columnconfigure $left.f 0 -weight 0
     grid rowconfigure    $left.f 0 -weight 1
+
+    # 4. Log area
+    grid columnconfigure $right 0 -weight 1
+    grid rowconfigure    $right 1 -weight 1
 }
 
 proc handle_exit {} {
