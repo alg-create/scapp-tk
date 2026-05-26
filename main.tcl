@@ -196,7 +196,7 @@ proc ui::build {} {
         .p.l.f.c.events configure -width 1 -height 1
     }
 
-    ttk::frame $left.f
+    ttk::frame $left.f -relief sunken -borderwidth 2
     set vscroll [ttk::scrollbar $left.f.vscroll -orient vertical -command "$left.f.c yview"]
     set hscroll [ttk::scrollbar $left.f.hscroll -orient horizontal -command "$left.f.c xview"]
     canvas $left.f.c -yscrollcommand "ui::show_hide_scrollbar $vscroll vertical" -xscrollcommand "ui::show_hide_scrollbar $hscroll horizontal"
