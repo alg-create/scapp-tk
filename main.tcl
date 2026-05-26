@@ -33,8 +33,9 @@ namespace eval ui {
     }
 }
 
-proc ui::update_scrollable_area {path} {
-    $path configure -scrollregion [$path bbox all]
+proc ui::remove_flashcard {path} {
+    destroy $path
+    set items [lsearch -all -inline -not -exact $pending_events $path]
 }
 
 proc ui::flashcard {base title} {
@@ -43,14 +44,13 @@ proc ui::flashcard {base title} {
     set hdr [ttk::frame $path.header]
     grid [ttk::button $hdr.close -style Close.Toolbutton -takefocus 0 \
         -text "×" \
-        -command "destroy $path"
+        -command "destroy $path; "
     ] -row 0 -column 0 -sticky w
     grid [ttk::label $hdr.title -text $title] -row 0 -column 1 -sticky w
     grid columnconfigure $hdr 1 -weight 1
     $path configure -labelwidget $hdr
     tooltip $hdr.close "Remove event"
     lappend ui::pending_events $path
-    ui::update_scrollable_area [winfo parent $base]
     return $path
 }
 
@@ -131,6 +131,19 @@ proc ui::build_manual_entry {path} {
     return $path
 }
 
+proc ui::show_hide_scrollbar {scroll first last} {
+    $scroll set $first $last
+    if {$first <= 0.0 && $last >= 1.0} {
+        grid remove $scroll
+    } else {
+        grid $scroll -row 0 -column 0 -sticky nsw
+    }
+}
+
+proc ui::update_scrollable_area {path} {
+    $path configure -scrollregion [$path bbox all]
+}
+
 proc ui::build {} {
     variable evts
     set menubar [ttk::frame .top]
@@ -144,15 +157,19 @@ proc ui::build {} {
 
     ttk::label $left.lbl -text "Notification"
     ttk::button $left.clear -text "Clear ⎚" -command {
-        foreach path $ui::pending_events {
-            destroy $path
-        }
+        destroy {*}[winfo children .p.l.f.c.events]
+        set ui::pending_events [list]
+        .p.l.f.c.events configure -width 1 -height 1
     }
 
     ttk::frame $left.f
-    canvas $left.f.c -yscrollcommand "[ttk::scrollbar $left.f.vscroll -orient vertical -command "$left.f.c yview"] set"
+    set vscroll [ttk::scrollbar $left.f.vscroll -orient vertical -command "$left.f.c yview"]
+    canvas $left.f.c -yscrollcommand "ui::show_hide_scrollbar $vscroll"
     set ::winId [$left.f.c create window 0 0 -window [ttk::frame $left.f.c.events] -anchor nw]
     bind $left.f.c <Configure> {
+        ui::update_scrollable_area .p.l.f.c
+    }
+    bind $left.f.c.events <Configure> {
         ui::update_scrollable_area .p.l.f.c
     }
 
@@ -179,7 +196,6 @@ proc ui::build {} {
     grid $left.f              -column 0 -row 3 -sticky nsew -columnspan 3
     grid $screen              -column 1 -row 2
 
-    grid $left.f.vscroll      -column 0 -row 0 -sticky nsw
     grid $left.f.c            -column 1 -row 0 -sticky nswe
 
     # 1. Configure the root window to allow the main panedwindow (row 1) to stretch
