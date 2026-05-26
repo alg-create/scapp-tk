@@ -209,10 +209,13 @@ proc ui::build {} {
         grid [$ui::evts($ui::selected_event) [ui::flashcard .p.l.f.c.events $ui::selected_event]]
     }
 
-    set screen [text $right.screen -bg "black" -fg "#33ff33" -insertbackground "#33ff33" -font {courier 12 bold} -width 32 -height 3]
+    set screen [text $right.screen -width 24 -height 3 -wrap none -bg "black" -fg "#55ff55" -font {Courier 12}]
+    $screen tag add .ce 1.0
+    $screen tag configure .ce -justify center
+    $screen insert end "Welcome\n" .ce
+    $screen configure -state disabled
 
     $left.event_selector current 0
-    $screen configure -state disabled
 
     grid $menubar             -column 0 -row 0 -sticky nwe
     grid $hamburger           -column 0 -row 0
@@ -224,7 +227,7 @@ proc ui::build {} {
     grid $left.clear          -column 2 -row 2
     grid $left.event_selector -column 0 -row 2
     grid $left.f              -column 0 -row 3 -sticky nsew -columnspan 3
-    grid $screen              -column 1 -row 2
+    grid $screen              -column 0 -row 0
 
     grid $left.f.c            -column 1 -row 0 -sticky nswe
 
