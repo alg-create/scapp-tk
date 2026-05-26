@@ -212,7 +212,7 @@ bind . <F5> {
 }
 
 wm title . "Nexo SCAP (tk)"
-wm minsize . [expr {int(550 * 1.0)}] [expr {int(550 * 1.0)}]
+#wm minsize . [expr {int(550 * 1.0)}] [expr {int(550 * 1.0)}]
 wm deiconify .
 raise .
 
