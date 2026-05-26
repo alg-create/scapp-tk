@@ -35,7 +35,7 @@ namespace eval ui {
 
 proc ui::remove_flashcard {path} {
     destroy $path
-    set items [lsearch -all -inline -not -exact $pending_events $path]
+    set ui::pending_events [lsearch -all -inline -not -exact $ui::pending_events $path]
 }
 
 proc ui::flashcard {base title} {
@@ -44,7 +44,7 @@ proc ui::flashcard {base title} {
     set hdr [ttk::frame $path.header]
     grid [ttk::button $hdr.close -style Close.Toolbutton -takefocus 0 \
         -text "×" \
-        -command "destroy $path; "
+        -command "ui::remove_flashcard $path"
     ] -row 0 -column 0 -sticky w
     grid [ttk::label $hdr.title -text $title] -row 0 -column 1 -sticky w
     grid columnconfigure $hdr 1 -weight 1
