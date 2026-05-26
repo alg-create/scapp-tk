@@ -98,7 +98,7 @@ proc ui::build_amount {path prefix desc isOptional} {
         set desc "$desc: *"
     }
     grid [ttk::label $path.$prefix-label -text $desc] -sticky w
-    grid [ttk::entry $path.$prefix-ammount -validate focusout -validatecommand "ui::is_amount_valid %P $isOptional"]
+    grid [ttk::entry $path.$prefix-amount -validate focusout -validatecommand "ui::is_amount_valid %P $isOptional"]
     return $path
 }
 
@@ -211,6 +211,12 @@ proc ui::build {} {
     ttk::button $left.send -text "Send ⇨" -command {
         foreach path $ui::pending_events {
             puts $path
+            foreach prefix {trx} {
+                set w $path.$prefix-amount
+                if {[winfo exists $w]} {
+                    $path.trx-amount validate
+                }
+            }
         }
     }
     ttk::combobox $left.event_selector -values [array names evts] -state readonly -textvariable ui::selected_event
