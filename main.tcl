@@ -210,7 +210,6 @@ proc ui::build {} {
 
     ttk::button $left.send -text "Send ⇨" -command {
         foreach path $ui::pending_events {
-            puts $path
             foreach prefix {trx} {
                 set w $path.$prefix-amount
                 if {[winfo exists $w]} {
