@@ -177,13 +177,19 @@ proc ui::build {} {
     grid $left.f.vscroll      -column 0 -row 0 -sticky nsw
     grid $left.f.c            -column 1 -row 0 -sticky nswe
 
-    grid columnconfigure .       0 -weight 1
-    grid rowconfigure    .top    0 -weight 0
-    grid rowconfigure    .p      0 -weight 1
-    grid columnconfigure  $left.f 1 -weight 1
-    grid columnconfigure  $left.f 0 -weight 0
+    # 1. Configure the root window to allow the main panedwindow (row 1) to stretch
+    grid columnconfigure . 0 -weight 1
+    grid rowconfigure    . 0 -weight 0
+    grid rowconfigure    . 1 -weight 1
 
+    # 2. Configure the left pane to allow the canvas container (row 3) to stretch
     grid columnconfigure $left 0 -weight 1
+    grid rowconfigure    $left 3 -weight 1
+
+    # 3. Configure the canvas container to allow the canvas (row 0) to stretch
+    grid columnconfigure $left.f 1 -weight 1
+    grid columnconfigure $left.f 0 -weight 0
+    grid rowconfigure    $left.f 0 -weight 1
 }
 
 proc handle_exit {} {
