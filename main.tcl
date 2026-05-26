@@ -149,12 +149,19 @@ proc ui::build_manual_entry {path} {
     return $path
 }
 
-proc ui::show_hide_scrollbar {scroll first last} {
+proc ui::show_hide_scrollbar {scroll orientation first last} {
     $scroll set $first $last
     if {$first <= 0.0 && $last >= 1.0} {
         grid remove $scroll
     } else {
-        grid $scroll -row 0 -column 0 -sticky nsw
+        switch $orientation {
+            vertical {
+                grid $scroll -row 0 -column 0 -sticky nsw
+            }
+            horizontal {
+                grid $scroll -row 1 -column 1 -sticky wes
+            }
+        }
     }
 }
 
@@ -182,7 +189,8 @@ proc ui::build {} {
 
     ttk::frame $left.f
     set vscroll [ttk::scrollbar $left.f.vscroll -orient vertical -command "$left.f.c yview"]
-    canvas $left.f.c -yscrollcommand "ui::show_hide_scrollbar $vscroll"
+    set hscroll [ttk::scrollbar $left.f.hscroll -orient horizontal -command "$left.f.c xview"]
+    canvas $left.f.c -yscrollcommand "ui::show_hide_scrollbar $vscroll vertical" -xscrollcommand "ui::show_hide_scrollbar $hscroll horizontal"
     set ::winId [$left.f.c create window 0 0 -window [ttk::frame $left.f.c.events] -anchor nw]
     bind $left.f.c <Configure> {
         ui::update_scrollable_area .p.l.f.c
