@@ -81,13 +81,31 @@ proc ui::build_language_selection {path} {
     return $path
 }
 
+proc ui::is_amount_valid {value isOptional} {
+    if {[string trim $value] eq ""} {
+        return $isOptional
+    }
+    if {[string is double -strict $value]} {
+        return [expr {double($value) >= 0}]
+    }
+    return 0
+}
+
+proc ui::build_amount {path prefix desc isOptional} {
+    if {$isOptional} {
+        set desc "$desc:"
+    } else {
+        set desc "$desc: *"
+    }
+    grid [ttk::label $path.$prefix-label -text $desc] -sticky w
+    grid [ttk::entry $path.$prefix-ammount -validate focusout -validatecommand "ui::is_amount_valid %P $isOptional"]
+    return $path
+}
+
 proc ui::build_amount_entry {path} {
-    grid [ttk::label $path.lamount -text "Amount: *"] -sticky w
-    grid [ttk::entry $path.eamount]
-    grid [ttk::label $path.lsupp -text "Supplementary (tip/gratuity):"] -sticky w
-    grid [ttk::entry $path.esupp]
-    grid [ttk::label $path.lcashback -text "Cashback:"] -sticky w
-    grid [ttk::entry $path.ecashback]
+    ui::build_amount $path trx "Amount" 0
+    ui::build_amount $path supp "Supplementary (tip/gratuity)" 1
+    ui::build_amount $path cash "Cashback" 1
     return $path
 }
 
@@ -222,6 +240,7 @@ ttk::style configure Close.Toolbutton -foreground #cc0000 -padding 1
 ttk::style map Close.Toolbutton -foreground {active #ff0000}
 ttk::style configure TLabel -padding 4
 ttk::style configure TButton -padding 4
+ttk::style map TEntry -fieldbackground {invalid #ffdddd}
 #ttk::style configure TFrame -borderwidth 1 -relief solid
 
 ui::build
