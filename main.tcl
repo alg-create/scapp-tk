@@ -33,6 +33,10 @@ namespace eval ui {
     }
 }
 
+proc ui::update_scrollable_area {path} {
+    $path configure -scrollregion [$path bbox all]
+}
+
 proc ui::flashcard {base title} {
     incr ui::pending_event_last
     set path [ttk::labelframe $base.f$ui::pending_event_last]
@@ -46,6 +50,7 @@ proc ui::flashcard {base title} {
     $path configure -labelwidget $hdr
     tooltip $hdr.close "Remove event"
     lappend ui::pending_events $path
+    ui::update_scrollable_area [winfo parent $base]
     return $path
 }
 
@@ -148,7 +153,7 @@ proc ui::build {} {
     canvas $left.f.c -yscrollcommand "[ttk::scrollbar $left.f.vscroll -orient vertical -command "$left.f.c yview"] set"
     set ::winId [$left.f.c create window 0 0 -window [ttk::frame $left.f.c.events] -anchor nw]
     bind $left.f.c <Configure> {
-        .p.l.f.c itemconfigure $::winId -width %w
+        ui::update_scrollable_area .p.l.f.c
     }
 
     ttk::button $left.send -text "Send ⇨"
