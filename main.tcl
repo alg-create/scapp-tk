@@ -201,7 +201,7 @@ ttk::style configure Close.Toolbutton -foreground #cc0000 -padding 1
 ttk::style map Close.Toolbutton -foreground {active #ff0000}
 ttk::style configure TLabel -padding 4
 ttk::style configure TButton -padding 4
-#ttk::style configure TFrame -background #3f3f3f
+#ttk::style configure TFrame -borderwidth 1 -relief solid
 
 ui::build
 
