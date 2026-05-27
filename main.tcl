@@ -1,17 +1,9 @@
 #!/usr/bin/env wish
 package require tooltip
 package require msgcat
-package require cffi
 namespace import msgcat::*
 namespace import tooltip::tooltip
 ##nagelfar syntax tooltip x*
-##nagelfar syntax cffi::prototype x*
-##nagelfar syntax cffi::callback x*
-##nagelfar syntax cffi::memory x*
-##nagelfar syntax cffi::Wrapper x*
-##nagelfar syntax dummy x*
-##nagelfar syntax Init x*
-##nagelfar syntax Main x*
 
 namespace eval ui {
     set pending_events [list]
@@ -288,28 +280,6 @@ proc cb2 {val} {
     puts "cb2 $val"
     return 0
 }
-
-proc cffi_experiment {} {
-    cffi::prototype function FunctionVoid int { }
-    cffi::prototype function FunctionInt int { a int }
-
-    set cb1 [cffi::callback new FunctionVoid cb1 -1]
-    set cb2 [cffi::callback new FunctionInt cb2 -1]
-    set arr [cffi::memory new {pointer[2]} [list $cb1 $cb2]]
-
-    cffi::Wrapper create dummy {./libdummy.so}
-    dummy function Main int {}
-    dummy function Init int {magic int uaction int f pointer}
-
-    Init 25620 0 $arr
-    Main
-
-    cffi::memory free $arr
-    cffi::callback free $cb2
-    cffi::callback free $cb1
-}
-
-cffi_experiment
 
 #ttk::style theme use clam
 ttk::style configure Close.Toolbutton -foreground #cc0000 -padding 1
