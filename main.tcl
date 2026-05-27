@@ -1,9 +1,17 @@
 #!/usr/bin/env wish
 package require tooltip
 package require msgcat
+package require asn
 namespace import msgcat::*
 namespace import tooltip::tooltip
+namespace import asn::*
 ##nagelfar syntax tooltip x*
+##nagelfar syntax asnGetResponse x*
+
+namespace eval rpc {
+    set listening_socket ""
+    array set response {}
+}
 
 namespace eval ui {
     set pending_events [list]
@@ -31,6 +39,32 @@ namespace eval ui {
         JCB           3537208456619863956
         AmEx          375493854861485
     }
+}
+
+proc rpc::format_peer {addr port} {
+    if {[string first ":" $addr] >= 0} {
+        return "\[$addr\]:$port"
+    } else {
+        return "$addr:$port"
+    }
+}
+
+proc rpc::handle_client {sock handle} {
+    asnGetResponse $sock rpc::response($handle)
+    ui::append_log scap rpc "Received $handle"
+    puts $rpc::response($handle)
+}
+
+proc rpc::accept {sock addr port} {
+    fconfigure $sock -blocking 0 -buffering none -encoding binary
+    set handle [format_peer $addr $port]
+    ui::append_log scap rpc "Connected $handle"
+    fileevent $sock readable [list rpc::handle_client $sock $handle]
+}
+
+proc rpc::listen {port} {
+    set rpc::listening_socket [socket -server rpc::accept $port]
+    ui::append_log scap rpc "Listening [rpc::format_peer :: $port]"
 }
 
 proc ui::remove_flashcard {path} {
@@ -169,7 +203,8 @@ proc ui::update_scrollable_area {path} {
     $path configure -scrollregion [$path bbox all]
 }
 
-proc ui::append_log {logarea subsystem method msg} {
+proc ui::append_log {subsystem method msg} {
+    set logarea .p.r.logs
     set numlines [lindex [split [$logarea index "end - 1 line"] "."] 0]
     $logarea configure -state normal
     if {$numlines==24} {$logarea delete 1.0 2.0}
@@ -226,10 +261,9 @@ proc ui::build {} {
     set screen [text $right.screen -width 24 -height 3 -wrap none -bg "black" -fg "#55ff55" -font {Courier 12}]
     $screen tag add .ce 1.0
     $screen tag configure .ce -justify center
-    $screen insert end "Welcome\n" .ce
+    $screen insert end "---\n" .ce
     $screen configure -state disabled
     set logarea [text $right.logs -wrap char -width 24]
-    ui::append_log $logarea scap output "Welcome"
 
     $left.event_selector current 0
 
@@ -302,6 +336,8 @@ wm geometry . 800x600
 #wm minsize . [expr {int(550 * 1.0)}] [expr {int(550 * 1.0)}]
 wm deiconify .
 raise .
+
+rpc::listen 50153
 
 mcset en none "None"
 mcset pl none "Żaden"
