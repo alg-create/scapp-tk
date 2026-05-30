@@ -1,16 +1,38 @@
 #!/usr/bin/env wish
+
 package require tooltip
 package require msgcat
 package require asn
+package require logger
+package require control
 namespace import msgcat::*
 namespace import tooltip::tooltip
 namespace import asn::*
-##nagelfar syntax tooltip x*
-##nagelfar syntax asnGetResponse x*
+
+control::control assert enabled 1
+namespace import control::assert
+
+##nagelfar syntax tooltip x x
+##nagelfar syntax logger::init x
+##nagelfar syntax assert E x*
+##nagelfar syntax control s x*
+##nagelfar syntax asnGetResponse x n
+##nagelfar syntax asnGetSequence n n
+##nagelfar syntax asnGetContext n n n? n?
+##nagelfar syntax asnPeekTag n n n n
+##nagelfar syntax asnGetLength n n
+
+set log [logger::init top]
 
 namespace eval rpc {
+    control::control assert enabled 1
+    namespace import ::control::assert
+    variable log
+    set log [logger::init top::rpc]
+
     set listening_socket ""
     array set response {}
+
 }
 
 namespace eval ui {
@@ -49,10 +71,36 @@ proc rpc::format_peer {addr port} {
     }
 }
 
+# Parse SCAP registration request.
+#
+# @param apdu Received full TLV buffer
+#
+# ScapiSocketRequest ::= {
+#    req: ScapiSocketRegistrationRequest ::= {
+#    }
+# }
+#
+# Currently it always exactly: 30 04 a0 02 30 00
+proc rpc::get_registration_request {apdu} {
+    asnGetSequence apdu req
+    asnPeekTag req tnumber tclass tconstructed
+    rpc::assert {$tnumber == 0 && $tclass eq "CONTEXT" && $tconstructed}
+    asnGetContext req cnumber
+    rpc::assert {$cnumber == 0}
+    asnGetSequence req registration
+    set len 0
+    asnGetLength registration len
+    rpc::assert {$len == 0}
+}
+
 proc rpc::handle_client {sock handle} {
-    asnGetResponse $sock rpc::response($handle)
+    if {[catch {asnGetResponse $sock apdu} err]} {
+        close $sock
+        ui::append_log scap rpc "Closed $handle: $err"
+        return
+    }
     ui::append_log scap rpc "Received $handle"
-    puts $rpc::response($handle)
+    rpc::get_registration_request $apdu
 }
 
 proc rpc::accept {sock addr port} {
@@ -305,16 +353,6 @@ proc handle_exit {} {
     exit
 }
 
-proc cb1 {} {
-    puts "cb1"
-    return 0
-}
-
-proc cb2 {val} {
-    puts "cb2 $val"
-    return 0
-}
-
 #ttk::style theme use clam
 ttk::style configure Close.Toolbutton -foreground #cc0000 -padding 1
 ttk::style map Close.Toolbutton -foreground {active #ff0000}
@@ -336,6 +374,9 @@ wm geometry . 800x600
 #wm minsize . [expr {int(550 * 1.0)}] [expr {int(550 * 1.0)}]
 wm deiconify .
 raise .
+
+#puts "Known log levels: [logger::levels]"
+#puts "Known services: [logger::services]" 
 
 rpc::listen 50153
 
