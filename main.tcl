@@ -105,18 +105,18 @@ proc rpc::get_registration_request {apdu} {
     rpc::assert {$len == 0}
 }
 
-proc rpc::handle_request {sock handle} {
+proc rpc::handle_request {sock} {
     variable log
     variable notifications_allowed
     if {[catch {asnGetResponse $sock apdu} err]} {
         close $sock
-        ui::append_log scap rpc "Closed $handle: $err"
-        ${log}::debug "handle_request: Closed $handle: $err"
+        ui::append_log scap rpc "Closed: $err"
+        ${log}::debug "handle_request: Closed: $err"
         set rpc::current_socket ""
         ui::update_screen "---"
         return
     }
-    ui::append_log scap rpc "Request $handle"
+    ui::append_log scap rpc "New request"
     asnGetSequence apdu req
     asnPeekTag req tnumber tclass tconstructed
     ${log}::debug "$tnumber == 0 && $tclass eq CONTEXT && $tconstructed"
@@ -191,27 +191,30 @@ proc rpc::language_selection {language_iso_code} {
     return [asnChoiceConstr 3 [asnSequence [asnContextConstr 13 [asnUTF8String $language_iso_code]]]]
 }
 
-proc rpc::handle_registration {sock handle} {
+proc rpc::notification {events} {
+    return [asnSequence [asnChoiceConstr 1 [asnSequence [asnContextConstr 2 [asnSequence $events]]]]]
+}
+
+proc rpc::handle_registration {sock} {
     variable log
     if {[catch {asnGetResponse $sock apdu} err]} {
         close $sock
-        ui::append_log scap rpc "Closed $handle: $err"
-        ${log}::debug "handle_registration: Closed $handle: $err"
+        ui::append_log scap rpc "Closed: $err"
+        ${log}::debug "handle_registration: Closed: $err"
         set rpc::current_socket ""
         ui::update_screen "---"
         return
     }
-    ui::append_log scap rpc "Received $handle"
+    ui::append_log scap rpc "Received"
     rpc::get_registration_request $apdu
     puts -nonewline $sock [rpc::registration_response]
-    fileevent $sock readable [list rpc::handle_request $sock $handle]
+    fileevent $sock readable [list rpc::handle_request $sock]
 }
 
 proc rpc::accept {sock addr port} {
     fconfigure $sock -blocking 0 -buffering none -translation binary -encoding binary
-    set handle [format_peer $addr $port]
-    ui::append_log scap rpc "Connected $handle"
-    fileevent $sock readable [list rpc::handle_registration $sock $handle]
+    ui::append_log scap rpc "Connected [format_peer $addr $port]"
+    fileevent $sock readable [list rpc::handle_registration $sock]
     set rpc::current_socket $sock
 }
 
@@ -490,8 +493,8 @@ proc send_pending_events {sock} {
         }
     }
     ${log}::debug "Will send [binary encode hex $events] to $sock"
-    fileevent $sock readable [list rpc::handle_request $sock "N/A"]
-    puts -nonewline $sock [asnSequence [asnChoiceConstr 1 [asnSequence [asnContextConstr 2 [asnSequence $events]]]]]
+    fileevent $sock readable [list rpc::handle_request $sock]
+    puts -nonewline $sock [rpc::notification $events]
     return 1
 }
 
