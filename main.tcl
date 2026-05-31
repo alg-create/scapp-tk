@@ -35,6 +35,96 @@ namespace import control::assert
 
 set log [logger::init top]
 
+array set service_to_num {
+    none 0
+    payment 1
+    refund 2
+    cancellation 3
+    preauth 4
+    updatePreauth 5
+    completion 6
+    cashAdvance 7
+    deferredPayment 8
+    deferredPaymentCompletion 9
+    voiceAuthorisation 16
+    cardholderDetection 17
+    cardValidityCheck 18
+    noShow 19
+}
+
+# Numeric values are defined by nexo, see nexoid sources for more details
+array set scap_num_to_msg {
+      0 crdhldrActNone
+      3 crdhldrEmvApproved
+      4 crdhldrEmvVoiceAuthRequired
+      6 crdhldrEmvCardError
+      7 crdhldrEmvDeclined
+     10 crdhldrEmvIncorrectPin
+     11 crdhldrEmvInsertCard
+     14 crdhldrEmvPleaseWait
+     15 crdhldrEmvProcessingError
+     16 crdhldrEmvRemoveCard
+     17 crdhldrEmvUseChipReader
+     18 crdhldrEmvUseMagStripe
+     19 crdhldrEmvTryAgain
+     20 crdhldrMsgWelcome
+     21 crdhldrMsgPresentCard
+     22 crdhldrMsgProcessing
+     23 crdhldrMsgCardReadOkRemoveCard
+     24 crdhldrMsgPleaseInsertOrSwipeCard
+     25 crdhldrMsgPleaseInsertOneCardOnly
+     26 crdhldrMsgApprovedPleaseSign
+     27 crdhldrMsgAuthorisingPleaseWait
+     28 crdhldrMsgInsertSwipeOrTryAnotherCard
+     29 crdhldrMsgPleaseInsertCard
+     30 crdhldrActClear
+     32 crdhldrMsgSeePhoneForInstructions
+     33 crdhldrMsgPresentCardAgain
+    176 crdhldrEntEnterPan
+    177 crdhldrEntEnterExpiryDate
+    178 crdhldrEntCvdPresence
+    179 crdhldrEntCvd
+    180 crdhldrEntDccConfirmation
+    181 crdhldrMsgSupplementaryAmountNotAllowed
+    182 crdhldrMsgCashbackNotAllowed
+    183 crdhldrMsgCashbackAmountTooHigh
+    184 crdhldrMsgPaymentAmountTooLowForCashback
+    185 crdhldrMsgTransactionAmountIsOutOfRange
+    196 crdhldrMsgEnterPin
+    192 crdhldrMsgCardWrongWayOrNoChip
+    193 crdhldrMsgReadError
+    194 crdhldrMsgAmount
+    195 crdhldrMsgMaxAmount
+    197 crdhldrMsgEnter
+    198 crdhldrMsgAmountAuthorised
+    199 crdhldrMsgLeftToBePaid
+    201 crdhldrMsgTransactionAborted
+    209 crdhldrMsgPaymentApprovedCashbackDeclined
+    211 crdhldrMsgChipErrorReEnterPin
+    212 crdhldrMsgPresentCardOrUseMagstripe
+    213 crdhldrMsgInsertOrPresentCard
+    217 crdhldrMsgInsertOrSwipeCard
+    218 crdhldrMsgNoPin
+    219 crdhldrMsgDifferentChoice
+    220 crdhldrMsgChooseApplication
+    221 crdhldrMsgAmountEstimated
+    222 crdhldrMsgFinalAmount
+    223 crdhldrMsgAmountIncrement
+    224 crdhldrMsgAmountDecrement
+    225 crdhldrMsgPrinterOutOfOrder
+    226 crdhldrMsgTip
+    227 crdhldrMsgCashback
+    228 crdhldrMsgPayment
+    229 crdhldrMsgTotal
+     50 crdhldrMsgRequestSignature
+     51 crdhldrMsgReceiptPrintingFailed
+     52 crdhldrMsgTerminalManagmentInProgress
+     53 crdhldrMsgForceTransactionApproval
+}
+
+namespace eval ntf {
+}
+
 namespace eval rpc {
     control::control assert enabled 1
     namespace import ::control::assert
@@ -62,7 +152,8 @@ namespace eval ui {
         "Manual Entry" ui::build_manual_entry
         "Amount Entry" ui::build_amount_entry
     }
-    set services [list "Card Validity Check" "Payment" "Refund" "Cancellation"]
+    set services [list none payment refund cancellation preauth updatePreauth \
+    deferredPaymentCompletion voiceAuthorisation cardholderDetection cardValidityCheck noShow]
     array set pans {
         Visa          4485936516057131
         "Visa E."     4917505187608015
@@ -139,7 +230,7 @@ proc rpc::handle_request {sock} {
                 switch $whatNum {
                     0 {
                         asnGetEnumeration what cardholderMessage
-                        ui::update_screen [mc $cardholderMessage]
+                        ui::update_screen "[mc $::scap_num_to_msg($cardholderMessage)] [format {[%x]} $cardholderMessage]"
                     }
                     default {
                         error "Scapi Interaction $whatNum isn't supported"
@@ -189,6 +280,10 @@ proc rpc::registration_response {} {
 
 proc rpc::language_selection {language_iso_code} {
     return [asnChoiceConstr 3 [asnSequence [asnContextConstr 13 [asnUTF8String $language_iso_code]]]]
+}
+
+proc rpc::service_selection {service} {
+    return [asnChoiceConstr 4 [asnSequence [asnContextConstr 14 [asnEnumeration $::service_to_num($service)]]]]
 }
 
 proc rpc::notification {events} {
@@ -248,7 +343,7 @@ proc ui::update_langiso {path} {
     set ui::langiso($path) $ui::langlist($ui::langname($path))
 }
 
-proc ui::language_selection_cleanup {path} {
+proc ui::cleanup_language_selection {path} {
     unset ui::langiso($path)
     unset ui::langname($path)
 }
@@ -264,7 +359,7 @@ proc ui::build_language_selection {path} {
     grid $code -row 1 -column 1
 
     bind $lang <<ComboboxSelected>> "ui::update_langiso $path"
-    bind $path <<Destroy>> "ui::language_selection_cleanup $path"
+    bind $path <<Destroy>> "ui::cleanup_language_selection $path"
 
     $lang current 0
     ui::update_langiso $path
@@ -299,8 +394,14 @@ proc ui::build_amount_entry {path} {
     return $path
 }
 
+proc ui::cleanup_service_selection {path} {
+    unset ntf::selected_service($path)
+}
+
 proc ui::build_service_selection {path} {
-    grid [ttk::combobox $path.service -values $ui::services -state readonly]
+    grid [ttk::combobox $path.service -values $ui::services -state readonly -textvariable ntf::selected_service($path)]
+    bind $path <<Destroy>> "ui::cleanup_service_selection $path"
+    $path.service current 0
     return $path
 }
 
@@ -485,6 +586,9 @@ proc send_pending_events {sock} {
         if {[info exists ui::langiso($path)]} {
             append events [rpc::language_selection $ui::langiso($path)]
         }
+        if {[info exists ntf::selected_service($path)]} {
+            append events [rpc::service_selection $ntf::selected_service($path)]
+        }
         foreach prefix {trx supp cash} {
             set w $path.$prefix-amount
             if {[winfo exists $w]} {
@@ -521,7 +625,7 @@ wm deiconify .
 raise .
 
 #puts "Known log levels: [logger::levels]"
-#puts "Known services: [logger::services]" 
+#puts "Known services: [logger::services]"
 
 rpc::listen 50153
 
@@ -569,105 +673,39 @@ mcset pl noShow "Brak pokazu"
 mcset fr noShow "Non-présentation"
 mcset de noShow "No-show"
 
-mcset C    0 crdhldrActNone
-mcset C    3 crdhldrEmvApproved
-mcset en   3 "Approved."
-mcset pl   3 "Zgoda."
-mcset fr   3 "Approuvée"
-mcset de   3 "Genehmigt"
-mcset C    4 crdhldrEmvVoiceAuthRequired
-mcset C    6 crdhldrEmvCardError
-mcset C    7 crdhldrEmvDeclined
-mcset C   10 crdhldrEmvIncorrectPin
-mcset C   11 crdhldrEmvInsertCard
-mcset en  11 "INSERT CARD"
-mcset pl  11 "WŁÓŻ KARTĘ"
-mcset fr  11 "INSÉRER LA CARTE"
-mcset de  11 "KARTE EINFÜHREN"
-mcset C   14 crdhldrEmvPleaseWait
-mcset en  14 "Please Wait..."
-mcset pl  14 "Proszę czekać..."
-mcset fr  14 "S'il vous plaît attendez..."
-mcset de  14 "Warten Sie mal..."
-mcset C   15 crdhldrEmvProcessingError
-mcset C   16 crdhldrEmvRemoveCard
-mcset C   17 crdhldrEmvUseChipReader
-mcset C   18 crdhldrEmvUseMagStripe
-mcset en  18 "USE MAG STRIPE"
-mcset pl  18 "UŻYJ PASKA MAGNETYCZNEGO"
-mcset fr  18 "UTILISER UNE BANDE MAGNÉTIQUE"
-mcset de  18 "MAGNETSTREIFEN VERWENDEN"
-mcset C   19 crdhldrEmvTryAgain
-mcset C   20 crdhldrMsgWelcome
-mcset en  20 "Welcome"
-mcset pl  20 "Witamy"
-mcset fr  20 "Bienvenue"
-mcset de  20 "Willkommen"
-mcset C   21 crdhldrMsgPresentCard
-mcset C   22 crdhldrMsgProcessing
-mcset C   23 crdhldrMsgCardReadOkRemoveCard
-mcset C   24 crdhldrMsgPleaseInsertOrSwipeCard
-mcset C   25 crdhldrMsgPleaseInsertOneCardOnly
-mcset C   26 crdhldrMsgApprovedPleaseSign
-mcset C   27 crdhldrMsgAuthorisingPleaseWait
-mcset C   28 crdhldrMsgInsertSwipeOrTryAnotherCard
-mcset C   29 crdhldrMsgPleaseInsertCard
-mcset C   30 crdhldrActClear
-mcset C   32 crdhldrMsgSeePhoneForInstructions
-mcset C   33 crdhldrMsgPresentCardAgain
-mcset C  176 crdhldrEntEnterPan
-mcset C  177 crdhldrEntEnterExpiryDate
-mcset C  178 crdhldrEntCvdPresence
-mcset C  179 crdhldrEntCvd
-mcset C  180 crdhldrEntDccConfirmation
-mcset C  181 crdhldrMsgSupplementaryAmountNotAllowed
-mcset en 181 "Supplementary amount isn't allowed"
-mcset pl 181 "Napiwek niedozwolony"
-mcset fr 181 "Le montant supplémentaire n'est pas autorisé"
-mcset de 181 "Ergänzungsbetrag ist nicht zulässig"
-mcset C  182 crdhldrMsgCashbackNotAllowed
-mcset en 182 "Cashback Not Allowed"
-mcset pl 182 "Wypłata gotówki niedozwolona"
-mcset fr 182 "Cashback non autorisé"
-mcset de 182 "Cashback nicht erlaubt"
-mcset C  183 crdhldrMsgCashbackAmountTooHigh
-mcset C  184 crdhldrMsgPaymentAmountTooLowForCashback
-mcset C  185 crdhldrMsgTransactionAmountIsOutOfRange
-mcset C  196 crdhldrMsgEnterPin
-mcset C  192 crdhldrMsgCardWrongWayOrNoChip
-mcset C  193 crdhldrMsgReadError
-mcset C  194 crdhldrMsgAmount
-mcset C  195 crdhldrMsgMaxAmount
-mcset C  197 crdhldrMsgEnter
-mcset C  198 crdhldrMsgAmountAuthorised
-mcset C  199 crdhldrMsgLeftToBePaid
-mcset C  201 crdhldrMsgTransactionAborted
-mcset en 201 "Transaction Aborted"
-mcset pl 201 "Transakcję przerwano"
-mcset fr 201 "Transaction annulée"
-mcset de 201 "Transaktion abgebrochen"
-mcset C  209 crdhldrMsgPaymentApprovedCashbackDeclined
-mcset C  211 crdhldrMsgChipErrorReEnterPin
-mcset C  212 crdhldrMsgPresentCardOrUseMagstripe
-mcset C  213 crdhldrMsgInsertOrPresentCard
-mcset C  217 crdhldrMsgInsertOrSwipeCard
-mcset C  218 crdhldrMsgNoPin
-mcset C  219 crdhldrMsgDifferentChoice
-mcset C  220 crdhldrMsgChooseApplication
-mcset C  221 crdhldrMsgAmountEstimated
-mcset C  222 crdhldrMsgFinalAmount
-mcset C  223 crdhldrMsgAmountIncrement
-mcset C  224 crdhldrMsgAmountDecrement
-mcset C  225 crdhldrMsgPrinterOutOfOrder
-mcset C  226 crdhldrMsgTip
-mcset C  227 crdhldrMsgCashback
-mcset C  228 crdhldrMsgPayment
-mcset C  229 crdhldrMsgTotal
-mcset C   50 crdhldrMsgRequestSignature
-mcset C   51 crdhldrMsgReceiptPrintingFailed
-mcset en  51 "Receipt printing failed!"
-mcset pl  51 "Drukowanie paragonu nie powiodło się!"
-mcset fr  51 "L'impression du reçu a échoué!"
-mcset de  51 "Belegdruck fehlgeschlagen!"
-mcset C   52 crdhldrMsgTerminalManagmentInProgress
-mcset C   53 crdhldrMsgForceTransactionApproval
+mcset en crdhldrEmvApproved "Approved."
+mcset pl crdhldrEmvApproved "Zgoda."
+mcset fr crdhldrEmvApproved "Approuvée"
+mcset de crdhldrEmvApproved "Genehmigt"
+mcset en crdhldrEmvInsertCard "INSERT CARD"
+mcset pl crdhldrEmvInsertCard "WŁÓŻ KARTĘ"
+mcset fr crdhldrEmvInsertCard "INSÉRER LA CARTE"
+mcset de crdhldrEmvInsertCard "KARTE EINFÜHREN"
+mcset en crdhldrEmvPleaseWait "Please Wait..."
+mcset pl crdhldrEmvPleaseWait "Proszę czekać..."
+mcset fr crdhldrEmvPleaseWait "S'il vous plaît attendez..."
+mcset de crdhldrEmvPleaseWait "Warten Sie mal..."
+mcset en crdhldrEmvUseMagStripe "USE MAG STRIPE"
+mcset pl crdhldrEmvUseMagStripe "UŻYJ PASKA MAGNETYCZNEGO"
+mcset fr crdhldrEmvUseMagStripe "UTILISER UNE BANDE MAGNÉTIQUE"
+mcset de crdhldrEmvUseMagStripe "MAGNETSTREIFEN VERWENDEN"
+mcset en crdhldrMsgWelcome "Welcome"
+mcset pl crdhldrMsgWelcome "Witamy"
+mcset fr crdhldrMsgWelcome "Bienvenue"
+mcset de crdhldrMsgWelcome "Willkommen"
+mcset en crdhldrMsgSupplementaryAmountNotAllowed "Supplementary amount isn't allowed"
+mcset pl crdhldrMsgSupplementaryAmountNotAllowed "Napiwek niedozwolony"
+mcset fr crdhldrMsgSupplementaryAmountNotAllowed "Le montant supplémentaire n'est pas autorisé"
+mcset de crdhldrMsgSupplementaryAmountNotAllowed "Ergänzungsbetrag ist nicht zulässig"
+mcset en crdhldrMsgCashbackNotAllowed "Cashback Not Allowed"
+mcset pl crdhldrMsgCashbackNotAllowed "Wypłata gotówki niedozwolona"
+mcset fr crdhldrMsgCashbackNotAllowed "Cashback non autorisé"
+mcset de crdhldrMsgCashbackNotAllowed "Cashback nicht erlaubt"
+mcset en crdhldrMsgTransactionAborted "Transaction Aborted"
+mcset pl crdhldrMsgTransactionAborted "Transakcję przerwano"
+mcset fr crdhldrMsgTransactionAborted "Transaction annulée"
+mcset de crdhldrMsgTransactionAborted "Transaktion abgebrochen"
+mcset en crdhldrMsgReceiptPrintingFailed "Receipt printing failed!"
+mcset pl crdhldrMsgReceiptPrintingFailed "Drukowanie paragonu nie powiodło się!"
+mcset fr crdhldrMsgReceiptPrintingFailed "L'impression du reçu a échoué!"
+mcset de crdhldrMsgReceiptPrintingFailed "Belegdruck fehlgeschlagen!"
