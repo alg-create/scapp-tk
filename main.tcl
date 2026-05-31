@@ -18,7 +18,10 @@ namespace import control::assert
 ##nagelfar syntax control s x*
 ##nagelfar syntax asnGetResponse x n
 ##nagelfar syntax asnGetSequence n n
+##nagelfar syntax asnGetSet n n
 ##nagelfar syntax asnGetContext n n n? n?
+##nagelfar syntax asnGetUTF8String n n
+##nagelfar syntax asnGetEnumeration n n
 ##nagelfar syntax asnPeekTag n n n n
 ##nagelfar syntax asnGetLength n v
 ##nagelfar syntax asnSequence x x*
@@ -116,11 +119,47 @@ proc rpc::handle_request {sock handle} {
     asnGetSequence apdu req
     asnPeekTag req tnumber tclass tconstructed
     ${log}::debug "$tnumber == 0 && $tclass eq CONTEXT && $tconstructed"
+    rpc::assert {$tclass eq "CONTEXT" && $tconstructed}
     if {$tnumber == 2} {
+        asnGetContext req cnumber
+        rpc::assert {$cnumber == 2}
+        asnGetContext req cnumber
+        rpc::assert {$cnumber >= 0 && $cnumber <= 5}
+        switch $cnumber {
+            0 { ${log}::debug "Update interfaces" }
+            1 {
+                ${log}::debug "Output interaction"
+                asnGetSequence req output
+                asnGetUTF8String output newLanguage
+                ${log}::debug "New language: $newLanguage"
+                mclocale $newLanguage
+                asnGetSet output what
+                asnGetContext what whatNum
+                switch $whatNum {
+                    0 {
+                        asnGetEnumeration what cardholderMessage
+                        ui::update_screen $cardholderMessage
+                    }
+                    default {
+                        error "Scapi Interaction $whatNum isn't supported"
+                    }
+                }
+            }
+            2 { ${log}::debug "Print message" }
+            3 { ${log}::debug "Entry interaction" }
+            4 { ${log}::debug "Authorise service" }
+            5 { ${log}::debug "Build Candidate List" }
+        }
+        # ScapiInteraction ::= {
+        #     language: fr
+        #     what: what ::= {
+        #         20 (crdhldrMsgWelcome)
+        #     }
+        # }
         puts -nonewline $sock [rpc::ack]
         return
     }
-    rpc::assert {$tnumber == 1 && $tclass eq "CONTEXT" && $tconstructed}
+    rpc::assert {$tnumber == 1}
     asnGetContext req cnumber
     ${log}::debug "cnumber == $cnumber"
     rpc::assert {$cnumber == 1}
@@ -334,6 +373,13 @@ proc ui::remove_all_flashcards {} {
     .p.l.f.c.events configure -width 1 -height 1
 }
 
+proc ui::update_screen {cardholderMessage} {
+    .p.r.screen configure -state normal
+    .p.r.screen delete 1.0 end
+    .p.r.screen insert 1.0 [mc $cardholderMessage] .ce
+    .p.r.screen configure -state disabled
+}
+
 proc ui::build {} {
     variable evts
     set menubar [ttk::frame .top]
@@ -520,3 +566,106 @@ mcset en noShow "No-show"
 mcset pl noShow "Brak pokazu"
 mcset fr noShow "Non-présentation"
 mcset de noShow "No-show"
+
+mcset C    0 crdhldrActNone
+mcset C    3 crdhldrEmvApproved
+mcset en   3 "Approved."
+mcset pl   3 "Zgoda."
+mcset fr   3 "Approuvée"
+mcset de   3 "Genehmigt"
+mcset C    4 crdhldrEmvVoiceAuthRequired
+mcset C    6 crdhldrEmvCardError
+mcset C    7 crdhldrEmvDeclined
+mcset C   10 crdhldrEmvIncorrectPin
+mcset C   11 crdhldrEmvInsertCard
+mcset en  11 "INSERT CARD"
+mcset pl  11 "WŁÓŻ KARTĘ"
+mcset fr  11 "INSÉRER LA CARTE"
+mcset de  11 "KARTE EINFÜHREN"
+mcset C   14 crdhldrEmvPleaseWait
+mcset en  14 "Please Wait..."
+mcset pl  14 "Proszę czekać..."
+mcset fr  14 "S'il vous plaît attendez..."
+mcset de  14 "Warten Sie mal..."
+mcset C   15 crdhldrEmvProcessingError
+mcset C   16 crdhldrEmvRemoveCard
+mcset C   17 crdhldrEmvUseChipReader
+mcset C   18 crdhldrEmvUseMagStripe
+mcset en  18 "USE MAG STRIPE"
+mcset pl  18 "UŻYJ PASKA MAGNETYCZNEGO"
+mcset fr  18 "UTILISER UNE BANDE MAGNÉTIQUE"
+mcset de  18 "MAGNETSTREIFEN VERWENDEN"
+mcset C   19 crdhldrEmvTryAgain
+mcset C   20 crdhldrMsgWelcome
+mcset en  20 "Welcome"
+mcset pl  20 "Witamy"
+mcset fr  20 "Bienvenue"
+mcset de  20 "Willkommen"
+mcset C   21 crdhldrMsgPresentCard
+mcset C   22 crdhldrMsgProcessing
+mcset C   23 crdhldrMsgCardReadOkRemoveCard
+mcset C   24 crdhldrMsgPleaseInsertOrSwipeCard
+mcset C   25 crdhldrMsgPleaseInsertOneCardOnly
+mcset C   26 crdhldrMsgApprovedPleaseSign
+mcset C   27 crdhldrMsgAuthorisingPleaseWait
+mcset C   28 crdhldrMsgInsertSwipeOrTryAnotherCard
+mcset C   29 crdhldrMsgPleaseInsertCard
+mcset C   30 crdhldrActClear
+mcset C   32 crdhldrMsgSeePhoneForInstructions
+mcset C   33 crdhldrMsgPresentCardAgain
+mcset C  176 crdhldrEntEnterPan
+mcset C  177 crdhldrEntEnterExpiryDate
+mcset C  178 crdhldrEntCvdPresence
+mcset C  179 crdhldrEntCvd
+mcset C  180 crdhldrEntDccConfirmation
+mcset C  181 crdhldrMsgSupplementaryAmountNotAllowed
+mcset en 181 "Supplementary amount isn't allowed"
+mcset pl 181 "Napiwek niedozwolony"
+mcset fr 181 "Le montant supplémentaire n'est pas autorisé"
+mcset de 181 "Ergänzungsbetrag ist nicht zulässig"
+mcset C  182 crdhldrMsgCashbackNotAllowed
+mcset en 182 "Cashback Not Allowed"
+mcset pl 182 "Wypłata gotówki niedozwolona"
+mcset fr 182 "Cashback non autorisé"
+mcset de 182 "Cashback nicht erlaubt"
+mcset C  183 crdhldrMsgCashbackAmountTooHigh
+mcset C  184 crdhldrMsgPaymentAmountTooLowForCashback
+mcset C  185 crdhldrMsgTransactionAmountIsOutOfRange
+mcset C  196 crdhldrMsgEnterPin
+mcset C  192 crdhldrMsgCardWrongWayOrNoChip
+mcset C  193 crdhldrMsgReadError
+mcset C  194 crdhldrMsgAmount
+mcset C  195 crdhldrMsgMaxAmount
+mcset C  197 crdhldrMsgEnter
+mcset C  198 crdhldrMsgAmountAuthorised
+mcset C  199 crdhldrMsgLeftToBePaid
+mcset C  201 crdhldrMsgTransactionAborted
+mcset en 201 "Transaction Aborted"
+mcset pl 201 "Transakcję przerwano"
+mcset fr 201 "Transaction annulée"
+mcset de 201 "Transaktion abgebrochen"
+mcset C  209 crdhldrMsgPaymentApprovedCashbackDeclined
+mcset C  211 crdhldrMsgChipErrorReEnterPin
+mcset C  212 crdhldrMsgPresentCardOrUseMagstripe
+mcset C  213 crdhldrMsgInsertOrPresentCard
+mcset C  217 crdhldrMsgInsertOrSwipeCard
+mcset C  218 crdhldrMsgNoPin
+mcset C  219 crdhldrMsgDifferentChoice
+mcset C  220 crdhldrMsgChooseApplication
+mcset C  221 crdhldrMsgAmountEstimated
+mcset C  222 crdhldrMsgFinalAmount
+mcset C  223 crdhldrMsgAmountIncrement
+mcset C  224 crdhldrMsgAmountDecrement
+mcset C  225 crdhldrMsgPrinterOutOfOrder
+mcset C  226 crdhldrMsgTip
+mcset C  227 crdhldrMsgCashback
+mcset C  228 crdhldrMsgPayment
+mcset C  229 crdhldrMsgTotal
+mcset C   50 crdhldrMsgRequestSignature
+mcset C   51 crdhldrMsgReceiptPrintingFailed
+mcset en  51 "Receipt printing failed!"
+mcset pl  51 "Drukowanie paragonu nie powiodło się!"
+mcset fr  51 "L'impression du reçu a échoué!"
+mcset de  51 "Belegdruck fehlgeschlagen!"
+mcset C   52 crdhldrMsgTerminalManagmentInProgress
+mcset C   53 crdhldrMsgForceTransactionApproval
