@@ -29,7 +29,9 @@ namespace import control::assert
 ##nagelfar syntax asnChoiceConstr x x
 ##nagelfar syntax asnChoice x x
 ##nagelfar syntax asnContext x x
-##nagelfar syntax asnContextConstr x x
+##nagelfar syntax asnContextConstr x x*
+##nagelfar syntax asnApplication x x
+##nagelfar syntax asnApplicationConstr x x*
 ##nagelfar syntax asnNull
 ##nagelfar syntax asnUTF8String x
 
@@ -283,7 +285,7 @@ proc rpc::der_language_selection {language_iso_code} {
 }
 
 proc rpc::der_service_selection {service} {
-    return [asnChoiceConstr 4 [asnSequence [asnContextConstr 14 [asnEnumeration $::service_to_num($service)]]]]
+    return [asnChoiceConstr 4 [asnSequence [asnApplicationConstr 14 [asnEnumeration $::service_to_num($service)]]]]
 }
 
 proc rpc::der_notification {events} {
