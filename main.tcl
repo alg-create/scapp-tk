@@ -113,6 +113,7 @@ proc rpc::handle_request {sock handle} {
         ui::append_log scap rpc "Closed $handle: $err"
         ${log}::debug "handle_request: Closed $handle: $err"
         set rpc::current_socket ""
+        ui::update_screen "---"
         return
     }
     ui::append_log scap rpc "Request $handle"
@@ -138,7 +139,7 @@ proc rpc::handle_request {sock handle} {
                 switch $whatNum {
                     0 {
                         asnGetEnumeration what cardholderMessage
-                        ui::update_screen $cardholderMessage
+                        ui::update_screen [mc $cardholderMessage]
                     }
                     default {
                         error "Scapi Interaction $whatNum isn't supported"
@@ -200,6 +201,7 @@ proc rpc::handle_registration {sock handle} {
         ui::append_log scap rpc "Closed $handle: $err"
         ${log}::debug "handle_registration: Closed $handle: $err"
         set rpc::current_socket ""
+        ui::update_screen "---"
         return
     }
     ui::append_log scap rpc "Received $handle"
@@ -373,10 +375,10 @@ proc ui::remove_all_flashcards {} {
     .p.l.f.c.events configure -width 1 -height 1
 }
 
-proc ui::update_screen {cardholderMessage} {
+proc ui::update_screen {msg} {
     .p.r.screen configure -state normal
     .p.r.screen delete 1.0 end
-    .p.r.screen insert 1.0 [mc $cardholderMessage] .ce
+    .p.r.screen insert 1.0 $msg .ce
     .p.r.screen configure -state disabled
 }
 
