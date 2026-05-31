@@ -175,10 +175,7 @@ proc rpc::handle_request {sock handle} {
 
 # 30 06 a2 04 a1 02 05 00
 proc rpc::ack {} {
-    return [
-    asnSequence [
-        asnChoiceConstr 2 [
-            asnChoiceConstr 1 [asnNull]]]]
+    return [asnSequence [asnChoiceConstr 2 [asnChoiceConstr 1 [asnNull]]]]
 }
 
 # ScapiSocketResponse ::= {
