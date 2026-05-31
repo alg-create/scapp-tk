@@ -20,7 +20,15 @@ namespace import control::assert
 ##nagelfar syntax asnGetSequence n n
 ##nagelfar syntax asnGetContext n n n? n?
 ##nagelfar syntax asnPeekTag n n n n
-##nagelfar syntax asnGetLength n n
+##nagelfar syntax asnGetLength n v
+##nagelfar syntax asnSequence x x*
+##nagelfar syntax asnEnumeration x
+##nagelfar syntax asnChoiceConstr x x
+##nagelfar syntax asnChoice x x
+##nagelfar syntax asnContext x x
+##nagelfar syntax asnContextConstr x x
+##nagelfar syntax asnNull
+##nagelfar syntax asnUTF8String x
 
 set log [logger::init top]
 
@@ -31,8 +39,9 @@ namespace eval rpc {
     set log [logger::init top::rpc]
 
     set listening_socket ""
+    set current_socket ""
     array set response {}
-
+    set notifications_allowed 0
 }
 
 namespace eval ui {
@@ -93,21 +102,75 @@ proc rpc::get_registration_request {apdu} {
     rpc::assert {$len == 0}
 }
 
-proc rpc::handle_client {sock handle} {
+proc rpc::handle_request {sock handle} {
+    variable log
+    variable notifications_allowed
     if {[catch {asnGetResponse $sock apdu} err]} {
         close $sock
         ui::append_log scap rpc "Closed $handle: $err"
+        ${log}::debug "handle_request: Closed $handle: $err"
+        set rpc::current_socket ""
+        return
+    }
+    ui::append_log scap rpc "Request $handle"
+    asnGetSequence apdu req
+    asnPeekTag req tnumber tclass tconstructed
+    ${log}::debug "$tnumber == 0 && $tclass eq CONTEXT && $tconstructed"
+    if {$tnumber == 2} {
+        puts -nonewline $sock [rpc::ack]
+        return
+    }
+    rpc::assert {$tnumber == 1 && $tclass eq "CONTEXT" && $tconstructed}
+    asnGetContext req cnumber
+    ${log}::debug "cnumber == $cnumber"
+    rpc::assert {$cnumber == 1}
+    asnGetSequence req notificationRequest
+    set len 0
+    asnGetLength notificationRequest len
+    rpc::assert {$len == 0}
+    ${log}::debug "Can send notifications"
+    set notifications_allowed 1
+    fileevent $sock readable {}
+}
+
+# 30 06 a2 04 a1 02 05 00
+proc rpc::ack {} {
+    return [
+    asnSequence [
+        asnChoiceConstr 2 [
+            asnChoiceConstr 1 [asnNull]]]]
+}
+
+# ScapiSocketResponse ::= {
+#    rsp: ScapiSocketRegistrationAnswer ::= {
+#    }
+#}
+# @retuns 30 04 a0 02 30 00
+proc rpc::registration_response {} {
+    return [asnSequence [asnChoiceConstr 0 [asnSequence {}]]]
+}
+
+proc rpc::handle_registration {sock handle} {
+    variable log
+    if {[catch {asnGetResponse $sock apdu} err]} {
+        close $sock
+        ui::append_log scap rpc "Closed $handle: $err"
+        ${log}::debug "handle_registration: Closed $handle: $err"
+        set rpc::current_socket ""
         return
     }
     ui::append_log scap rpc "Received $handle"
     rpc::get_registration_request $apdu
+    puts -nonewline $sock [rpc::registration_response]
+    fileevent $sock readable [list rpc::handle_request $sock $handle]
 }
 
 proc rpc::accept {sock addr port} {
     fconfigure $sock -blocking 0 -buffering none -encoding binary
     set handle [format_peer $addr $port]
     ui::append_log scap rpc "Connected $handle"
-    fileevent $sock readable [list rpc::handle_client $sock $handle]
+    fileevent $sock readable [list rpc::handle_registration $sock $handle]
+    set rpc::current_socket $sock
 }
 
 proc rpc::listen {port} {
@@ -261,6 +324,12 @@ proc ui::append_log {subsystem method msg} {
     $logarea configure -state disabled
 }
 
+proc ui::remove_all_flashcards {} {
+    destroy {*}[winfo children .p.l.f.c.events]
+    set ui::pending_events [list]
+    .p.l.f.c.events configure -width 1 -height 1
+}
+
 proc ui::build {} {
     variable evts
     set menubar [ttk::frame .top]
@@ -273,11 +342,7 @@ proc ui::build {} {
     $main add $right -weight 1
 
     ttk::label $left.lbl -text "Notification"
-    ttk::button $left.clear -text "Clear ⎚" -command {
-        destroy {*}[winfo children .p.l.f.c.events]
-        set ui::pending_events [list]
-        .p.l.f.c.events configure -width 1 -height 1
-    }
+    ttk::button $left.clear -text "Clear ⎚" -command ui::remove_all_flashcards
 
     ttk::frame $left.f -relief sunken -borderwidth 2
     set vscroll [ttk::scrollbar $left.f.vscroll -orient vertical -command "$left.f.c yview"]
@@ -299,6 +364,9 @@ proc ui::build {} {
                     $path.trx-amount validate
                 }
             }
+        }
+        if {[send_pending_events $rpc::current_socket]} {
+            ui::remove_all_flashcards
         }
     }
     ttk::combobox $left.event_selector -values [array names evts] -state readonly -textvariable ui::selected_event
@@ -351,6 +419,29 @@ proc ui::build {} {
 
 proc handle_exit {} {
     exit
+}
+
+proc send_pending_events {sock} {
+    variable log
+    if {!$rpc::notifications_allowed} {
+        ${log}::warn "No events are accepted by FAT"
+        return 0
+    }
+    set rpc::notifications_allowed 0
+    set events {}
+    #set events [asnSequence [asnChoiceConstr 3 [asnSequence [asnChoiceConstr 13 [asnUTF8String "fr"]]]]]
+    foreach path $ui::pending_events {
+        foreach prefix {trx supp cash} {
+            set w $path.$prefix-amount
+            if {[winfo exists $w]} {
+                $path.trx-amount validate
+            }
+        }
+    }
+    ${log}::debug "Will send events to $sock"
+    fileevent $sock readable [list rpc::handle_request $sock "N/A"]
+    puts -nonewline $sock [asnSequence [asnChoiceConstr 1 [asnSequence [asnContextConstr 2 [asnSequence $events]]]]]
+    return 1
 }
 
 #ttk::style theme use clam
