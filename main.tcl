@@ -166,7 +166,7 @@ proc rpc::handle_registration {sock handle} {
 }
 
 proc rpc::accept {sock addr port} {
-    fconfigure $sock -blocking 0 -buffering none -encoding binary
+    fconfigure $sock -blocking 0 -buffering none -translation binary -encoding binary
     set handle [format_peer $addr $port]
     ui::append_log scap rpc "Connected $handle"
     fileevent $sock readable [list rpc::handle_registration $sock $handle]
@@ -429,7 +429,10 @@ proc send_pending_events {sock} {
     }
     set rpc::notifications_allowed 0
     set events {}
-    #set events [asnSequence [asnChoiceConstr 3 [asnSequence [asnChoiceConstr 13 [asnUTF8String "fr"]]]]]
+
+    set languageSelection [asnChoiceConstr 3 [asnSequence [asnContextConstr 13 [asnUTF8String "fr"]]]]
+    set events $languageSelection
+
     foreach path $ui::pending_events {
         foreach prefix {trx supp cash} {
             set w $path.$prefix-amount
