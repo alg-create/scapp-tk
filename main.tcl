@@ -248,7 +248,7 @@ proc rpc::handle_request {sock} {
         #         20 (crdhldrMsgWelcome)
         #     }
         # }
-        puts -nonewline $sock [rpc::ack]
+        puts -nonewline $sock [rpc::der_ack]
         return
     }
     rpc::assert {$tnumber == 1}
@@ -265,7 +265,7 @@ proc rpc::handle_request {sock} {
 }
 
 # 30 06 a2 04 a1 02 05 00
-proc rpc::ack {} {
+proc rpc::der_ack {} {
     return [asnSequence [asnChoiceConstr 2 [asnChoiceConstr 1 [asnNull]]]]
 }
 
@@ -274,19 +274,19 @@ proc rpc::ack {} {
 #    }
 #}
 # @retuns 30 04 a0 02 30 00
-proc rpc::registration_response {} {
+proc rpc::der_registration_response {} {
     return [asnSequence [asnChoiceConstr 0 [asnSequence {}]]]
 }
 
-proc rpc::language_selection {language_iso_code} {
+proc rpc::der_language_selection {language_iso_code} {
     return [asnChoiceConstr 3 [asnSequence [asnContextConstr 13 [asnUTF8String $language_iso_code]]]]
 }
 
-proc rpc::service_selection {service} {
+proc rpc::der_service_selection {service} {
     return [asnChoiceConstr 4 [asnSequence [asnContextConstr 14 [asnEnumeration $::service_to_num($service)]]]]
 }
 
-proc rpc::notification {events} {
+proc rpc::der_notification {events} {
     return [asnSequence [asnChoiceConstr 1 [asnSequence [asnContextConstr 2 [asnSequence $events]]]]]
 }
 
@@ -302,7 +302,7 @@ proc rpc::handle_registration {sock} {
     }
     ui::append_log scap rpc "Received"
     rpc::get_registration_request $apdu
-    puts -nonewline $sock [rpc::registration_response]
+    puts -nonewline $sock [rpc::der_registration_response]
     fileevent $sock readable [list rpc::handle_request $sock]
 }
 
@@ -323,7 +323,7 @@ proc ui::remove_flashcard {path} {
     set ui::pending_events [lsearch -all -inline -not -exact $ui::pending_events $path]
 }
 
-proc ui::flashcard {base title} {
+proc ui::build_flashcard {base title} {
     incr ui::pending_event_last
     set path [ttk::labelframe $base.f$ui::pending_event_last]
     set hdr [ttk::frame $path.header]
@@ -409,7 +409,7 @@ proc ui::update_pan {path} {
     set ui::pan($path) $ui::pans($ui::brand($path))
 }
 
-proc ui::reset_brand {n1 n2 op} {
+proc ui::update_brand {n1 n2 op} {
     variable pans
     foreach brand [array names pans] {
         if {$ui::pan($n2) eq $ui::pans($brand)} {
@@ -436,7 +436,7 @@ proc ui::build_manual_entry {path} {
     grid [ttk::combobox $path.expiry.emonth -values $months]    -row 4 -column 1
 
     bind $path.dummy <<ComboboxSelected>> "ui::update_pan $path"
-    trace add variable ui::pan($path) write ui::reset_brand
+    trace add variable ui::pan($path) write ui::update_brand
     return $path
 }
 
@@ -524,7 +524,7 @@ proc ui::build {} {
     }
     ttk::combobox $left.event_selector -values [array names evts] -state readonly -textvariable ui::selected_event
     ttk::button $left.push -text "Add ⇩" -command {
-        grid [$ui::evts($ui::selected_event) [ui::flashcard .p.l.f.c.events $ui::selected_event]]
+        grid [$ui::evts($ui::selected_event) [ui::build_flashcard .p.l.f.c.events $ui::selected_event]]
     }
 
     set screen [text $right.screen -width 24 -height 3 -wrap none -bg "black" -fg "#55ff55" -font {Courier 12}]
@@ -584,10 +584,10 @@ proc send_pending_events {sock} {
     set events {}
     foreach path $ui::pending_events {
         if {[info exists ui::langiso($path)]} {
-            append events [rpc::language_selection $ui::langiso($path)]
+            append events [rpc::der_language_selection $ui::langiso($path)]
         }
         if {[info exists ntf::selected_service($path)]} {
-            append events [rpc::service_selection $ntf::selected_service($path)]
+            append events [rpc::der_service_selection $ntf::selected_service($path)]
         }
         foreach prefix {trx supp cash} {
             set w $path.$prefix-amount
@@ -598,7 +598,7 @@ proc send_pending_events {sock} {
     }
     ${log}::debug "Will send [binary encode hex $events] to $sock"
     fileevent $sock readable [list rpc::handle_request $sock]
-    puts -nonewline $sock [rpc::notification $events]
+    puts -nonewline $sock [rpc::der_notification $events]
     return 1
 }
 
