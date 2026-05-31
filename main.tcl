@@ -150,6 +150,10 @@ proc rpc::registration_response {} {
     return [asnSequence [asnChoiceConstr 0 [asnSequence {}]]]
 }
 
+proc rpc::language_selection {language_iso_code} {
+    return [asnChoiceConstr 3 [asnSequence [asnContextConstr 13 [asnUTF8String $language_iso_code]]]]
+}
+
 proc rpc::handle_registration {sock handle} {
     variable log
     if {[catch {asnGetResponse $sock apdu} err]} {
@@ -429,11 +433,10 @@ proc send_pending_events {sock} {
     }
     set rpc::notifications_allowed 0
     set events {}
-
-    set languageSelection [asnChoiceConstr 3 [asnSequence [asnContextConstr 13 [asnUTF8String "fr"]]]]
-    set events $languageSelection
-
     foreach path $ui::pending_events {
+        if {[info exists ui::langiso($path)]} {
+            append events [rpc::language_selection $ui::langiso($path)]
+        }
         foreach prefix {trx supp cash} {
             set w $path.$prefix-amount
             if {[winfo exists $w]} {
@@ -441,7 +444,7 @@ proc send_pending_events {sock} {
             }
         }
     }
-    ${log}::debug "Will send events to $sock"
+    ${log}::debug "Will send [binary encode hex $events] to $sock"
     fileevent $sock readable [list rpc::handle_request $sock "N/A"]
     puts -nonewline $sock [asnSequence [asnChoiceConstr 1 [asnSequence [asnContextConstr 2 [asnSequence $events]]]]]
     return 1
