@@ -1,13 +1,15 @@
 #!/usr/bin/env wish
 
+set app_dir [file dirname [file normalize [info script]]]
+lappend auto_path [file join $app_dir lib]
+
 package require tooltip
 package require msgcat
-package require asn
 package require logger
 package require control
+package require scapi_codec
 namespace import msgcat::*
 namespace import tooltip::tooltip
-namespace import asn::*
 
 control::control assert enabled 1
 namespace import control::assert
@@ -16,26 +18,6 @@ namespace import control::assert
 ##nagelfar syntax logger::init x
 ##nagelfar syntax assert E x*
 ##nagelfar syntax control s x*
-##nagelfar syntax asnGetResponse x n
-##nagelfar syntax asnGetSequence n n
-##nagelfar syntax asnGetSet n n
-##nagelfar syntax asnGetContext n n n? n?
-##nagelfar syntax asnGetUTF8String n n
-##nagelfar syntax asnGetEnumeration n n
-##nagelfar syntax asnPeekTag n n n n
-##nagelfar syntax asnGetLength n v
-##nagelfar syntax asnSequence x x*
-##nagelfar syntax asnEnumeration x
-##nagelfar syntax asnInteger x
-##nagelfar syntax asnBoolean x
-##nagelfar syntax asnChoiceConstr x x
-##nagelfar syntax asnChoice x x
-##nagelfar syntax asnContext x x
-##nagelfar syntax asnContextConstr x x*
-##nagelfar syntax asnApplication x x
-##nagelfar syntax asnApplicationConstr x x*
-##nagelfar syntax asnNull
-##nagelfar syntax asnUTF8String x
 
 set log [logger::init top]
 
@@ -192,21 +174,13 @@ proc rpc::format_peer {addr port} {
 #
 # Currently it always exactly: 30 04 a0 02 30 00
 proc rpc::get_registration_request {apdu} {
-    asnGetSequence apdu req
-    asnPeekTag req tnumber tclass tconstructed
-    rpc::assert {$tnumber == 0 && $tclass eq "CONTEXT" && $tconstructed}
-    asnGetContext req cnumber
-    rpc::assert {$cnumber == 0}
-    asnGetSequence req registration
-    set len 0
-    asnGetLength registration len
-    rpc::assert {$len == 0}
+    scapi::codec::decode_registration_request $apdu
 }
 
 proc rpc::handle_request {sock} {
     variable log
     variable notifications_allowed
-    if {[catch {asnGetResponse $sock apdu} err]} {
+    if {[catch {set apdu [scapi::codec::read_response $sock]} err]} {
         close $sock
         ui::append_log scap rpc "Closed: $err"
         ${log}::debug "handle_request: Closed: $err"
@@ -215,65 +189,57 @@ proc rpc::handle_request {sock} {
         return
     }
     ui::append_log scap rpc "New request"
-    asnGetSequence apdu req
-    asnPeekTag req tnumber tclass tconstructed
-    ${log}::debug "$tnumber == 0 && $tclass eq CONTEXT && $tconstructed"
-    rpc::assert {$tclass eq "CONTEXT" && $tconstructed}
-    if {$tnumber == 2} {
-        asnGetContext req cnumber
-        rpc::assert {$cnumber == 2}
-        asnGetContext req cnumber
-        rpc::assert {$cnumber >= 0 && $cnumber <= 5}
-        switch $cnumber {
-            0 { ${log}::debug "Update interfaces" }
-            1 {
-                ${log}::debug "Output interaction"
-                asnGetSequence req output
-                asnGetUTF8String output newLanguage
-                ${log}::debug "New language: $newLanguage"
-                mclocale $newLanguage
-                asnGetSet output what
-                asnGetContext what whatNum
-                switch $whatNum {
-                    0 {
-                        asnGetEnumeration what cardholderMessage
-                        ui::update_screen "[mc $::scap_num_to_msg($cardholderMessage)] [format {[%x]} $cardholderMessage]"
-                    }
-                    default {
-                        error "Scapi Interaction $whatNum isn't supported"
+    set request [scapi::codec::decode_socket_request $apdu]
+    switch [dict get $request kind] {
+        interaction {
+            set cnumber [dict get $request choice]
+            rpc::assert {$cnumber >= 0 && $cnumber <= 5}
+            switch $cnumber {
+                0 { ${log}::debug "Update interfaces" }
+                1 {
+                    ${log}::debug "Output interaction"
+                    set newLanguage [dict get $request output_language]
+                    ${log}::debug "New language: $newLanguage"
+                    mclocale $newLanguage
+                    set whatNum [dict get $request output_what]
+                    switch $whatNum {
+                        0 {
+                            set cardholderMessage [dict get $request output_message]
+                            ui::update_screen "[mc $::scap_num_to_msg($cardholderMessage)] [format {[%x]} $cardholderMessage]"
+                        }
+                        default {
+                            error "Scapi Interaction $whatNum isn't supported"
+                        }
                     }
                 }
+                2 { ${log}::debug "Print message" }
+                3 { ${log}::debug "Entry interaction" }
+                4 { ${log}::debug "Authorise service" }
+                5 { ${log}::debug "Build Candidate List" }
             }
-            2 { ${log}::debug "Print message" }
-            3 { ${log}::debug "Entry interaction" }
-            4 { ${log}::debug "Authorise service" }
-            5 { ${log}::debug "Build Candidate List" }
+            # ScapiInteraction ::= {
+            #     language: fr
+            #     what: what ::= {
+            #         20 (crdhldrMsgWelcome)
+            #     }
+            # }
+            puts -nonewline $sock [rpc::der_ack]
+            return
         }
-        # ScapiInteraction ::= {
-        #     language: fr
-        #     what: what ::= {
-        #         20 (crdhldrMsgWelcome)
-        #     }
-        # }
-        puts -nonewline $sock [rpc::der_ack]
-        return
+        notification_request {
+            ${log}::debug "Can send notifications"
+            set notifications_allowed 1
+            fileevent $sock readable {}
+        }
+        default {
+            error "Unsupported SCAPI request kind [dict get $request kind]"
+        }
     }
-    rpc::assert {$tnumber == 1}
-    asnGetContext req cnumber
-    ${log}::debug "cnumber == $cnumber"
-    rpc::assert {$cnumber == 1}
-    asnGetSequence req notificationRequest
-    set len 0
-    asnGetLength notificationRequest len
-    rpc::assert {$len == 0}
-    ${log}::debug "Can send notifications"
-    set notifications_allowed 1
-    fileevent $sock readable {}
 }
 
 # 30 06 a2 04 a1 02 05 00
 proc rpc::der_ack {} {
-    return [asnSequence [asnChoiceConstr 2 [asnChoiceConstr 1 [asnNull]]]]
+    return [scapi::codec::encode_ack]
 }
 
 # ScapiSocketResponse ::= {
@@ -282,48 +248,41 @@ proc rpc::der_ack {} {
 #}
 # @retuns 30 04 a0 02 30 00
 proc rpc::der_registration_response {} {
-    return [asnSequence [asnChoiceConstr 0 [asnSequence {}]]]
+    return [scapi::codec::encode_registration_response]
 }
 
 proc rpc::der_language_selection {language_iso_code} {
-    return [asnChoiceConstr 3 [asnSequence [asnContextConstr 13 [asnUTF8String $language_iso_code]]]]
+    return [scapi::codec::encode_language_selection $language_iso_code]
 }
 
 proc rpc::der_service_selection {service} {
-    return [asnChoiceConstr 4 [asnSequence [asnApplicationConstr 14 [asnEnumeration $::service_to_num($service)]]]]
+    return [scapi::codec::encode_service_selection $service]
 }
 
 # FIXME: Don't depend on global variables
 proc rpc::der_amount_entry {path} {
-    set amounts {}
+    set options {}
     if {[info exists ntf::amount($path)]} {
         set amount $ntf::amount($path)
-        if {$amount < 0} {
-            set amount [expr {abs($amount)}]
-            append amounts [asnApplicationConstr 147 [asnBoolean 1]]
-        }
-        append amounts [asnApplicationConstr 140 [asnInteger $amount]]
+    } else {
+        set amount ""
     }
     if {[info exists ntf::supplementary($path)]} {
-        if {$ntf::supplementary($path) eq "confirmed"} {
-            append amounts [asnContextConstr 0 [asnBoolean 1]]
-        } else {
-            append amounts [asnContextConstr 143 [asnInteger $ntf::supplementary($path)]]
-        }
+        lappend options -supplementary $ntf::supplementary($path)
     }
     if {[info exists ntf::cashback($path)]} {
-        append amounts [asnContextConstr 142 [asnInteger $ntf::cashback($path)]]
+        lappend options -cashback $ntf::cashback($path)
     }
-    return [asnChoiceConstr 8 [asnSequence $amounts]]
+    return [scapi::codec::encode_amount_entry $amount {*}$options]
 }
 
 proc rpc::der_notification {events} {
-    return [asnSequence [asnChoiceConstr 1 [asnSequence [asnContextConstr 2 [asnSequence $events]]]]]
+    return [scapi::codec::encode_notification $events]
 }
 
 proc rpc::handle_registration {sock} {
     variable log
-    if {[catch {asnGetResponse $sock apdu} err]} {
+    if {[catch {set apdu [scapi::codec::read_response $sock]} err]} {
         close $sock
         ui::append_log scap rpc "Closed: $err"
         ${log}::debug "handle_registration: Closed: $err"

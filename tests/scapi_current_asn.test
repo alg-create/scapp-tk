@@ -3,268 +3,78 @@ package require tcltest
 set testdir [file dirname [file normalize [info script]]]
 set root [file dirname $testdir]
 
-lappend auto_path [file join $root deps asn]
-package require asn 0.8.5
-namespace import ::asn::*
-
-namespace eval ::scapi_current {
-    array set service_to_num {
-        none 0
-        payment 1
-        refund 2
-        cancellation 3
-        preauth 4
-        updatePreauth 5
-        completion 6
-        cashAdvance 7
-        deferredPayment 8
-        deferredPaymentCompletion 9
-        voiceAuthorisation 16
-        cardholderDetection 17
-        cardValidityCheck 18
-        noShow 19
-    }
-}
-
-proc ::scapi_current::hex {bytes} {
-    binary encode hex $bytes
-}
-
-proc ::scapi_current::from_hex {hex} {
-    binary decode hex $hex
-}
-
-proc ::scapi_current::der_ack {} {
-    return [asnSequence [asnChoiceConstr 2 [asnChoiceConstr 1 [asnNull]]]]
-}
-
-proc ::scapi_current::der_registration_response {} {
-    return [asnSequence [asnChoiceConstr 0 [asnSequence {}]]]
-}
-
-proc ::scapi_current::der_language_selection {language_iso_code} {
-    return [asnChoiceConstr 3 [asnSequence [asnContextConstr 13 [asnUTF8String $language_iso_code]]]]
-}
-
-proc ::scapi_current::der_service_selection {service} {
-    return [asnChoiceConstr 4 [asnSequence [asnApplicationConstr 14 [asnEnumeration $::scapi_current::service_to_num($service)]]]]
-}
-
-proc ::scapi_current::der_amount_entry {path} {
-    set amounts {}
-    if {[info exists ::ntf::amount($path)]} {
-        set amount $::ntf::amount($path)
-        if {$amount < 0} {
-            set amount [expr {abs($amount)}]
-            append amounts [asnApplicationConstr 147 [asnBoolean 1]]
-        }
-        append amounts [asnApplicationConstr 140 [asnInteger $amount]]
-    }
-    if {[info exists ::ntf::supplementary($path)]} {
-        if {$::ntf::supplementary($path) eq "confirmed"} {
-            append amounts [asnContextConstr 0 [asnBoolean 1]]
-        } else {
-            append amounts [asnContextConstr 143 [asnInteger $::ntf::supplementary($path)]]
-        }
-    }
-    if {[info exists ::ntf::cashback($path)]} {
-        append amounts [asnContextConstr 142 [asnInteger $::ntf::cashback($path)]]
-    }
-    return [asnChoiceConstr 8 [asnSequence $amounts]]
-}
-
-proc ::scapi_current::der_notification {events} {
-    return [asnSequence [asnChoiceConstr 1 [asnSequence [asnContextConstr 2 [asnSequence $events]]]]]
-}
-
-proc ::scapi_current::decode_registration_request {hex} {
-    set apdu [from_hex $hex]
-    asnGetSequence apdu req
-    asnPeekTag req tnumber tclass tconstructed
-    asnGetContext req cnumber
-    asnGetSequence req registration
-    set len 0
-    asnGetLength registration len
-    return [list tag $tnumber class $tclass constructed $tconstructed choice $cnumber length $len remainder [hex $req]]
-}
-
-proc ::scapi_current::decode_notification_request {hex} {
-    set apdu [from_hex $hex]
-    asnGetSequence apdu req
-    asnPeekTag req tnumber tclass tconstructed
-    asnGetContext req cnumber
-    asnGetSequence req notificationRequest
-    set len 0
-    asnGetLength notificationRequest len
-    return [list tag $tnumber class $tclass constructed $tconstructed choice $cnumber length $len remainder [hex $req]]
-}
-
-proc ::scapi_current::der_output_interaction_request {language message} {
-    return [asnSequence [asnChoiceConstr 2 [asnChoiceConstr 1 [asnSequence \
-        [asnUTF8String $language] \
-        [asnSet [asnChoiceConstr 0 [asnEnumeration $message]]] \
-    ]]]]
-}
-
-proc ::scapi_current::decode_output_interaction_request {hex} {
-    set apdu [from_hex $hex]
-    asnGetSequence apdu req
-    asnPeekTag req tnumber tclass tconstructed
-    asnGetContext req outerChoice
-    asnGetContext req innerChoice
-    asnGetSequence req output
-    asnGetUTF8String output language
-    asnGetSet output what
-    asnGetContext what whatNum
-    asnGetEnumeration what cardholderMessage
-    return [list \
-        tag $tnumber \
-        class $tclass \
-        constructed $tconstructed \
-        outer_choice $outerChoice \
-        inner_choice $innerChoice \
-        language $language \
-        what $whatNum \
-        message $cardholderMessage \
-        req_remainder [hex $req] \
-        output_remainder [hex $output] \
-        what_remainder [hex $what] \
-    ]
-}
-
-namespace eval ::ntf {
-    array set amount {}
-    array set supplementary_amount {}
-    array set supplementary {}
-    array set cashback {}
-}
+lappend auto_path [file join $root lib]
+package require scapi_codec 0.1.0
 
 tcltest::test scapi-current-encode-1.1 {ack response wire bytes} -body {
-    ::scapi_current::hex [::scapi_current::der_ack]
+    ::scapi::codec::hex [::scapi::codec::encode_ack]
 } -result 3006a204a1020500
 
 tcltest::test scapi-current-encode-1.2 {registration response wire bytes} -body {
-    ::scapi_current::hex [::scapi_current::der_registration_response]
+    ::scapi::codec::hex [::scapi::codec::encode_registration_response]
 } -result 3004a0023000
 
 tcltest::test scapi-current-encode-2.1 {language selection event wire bytes} -body {
-    ::scapi_current::hex [::scapi_current::der_language_selection pl]
+    ::scapi::codec::hex [::scapi::codec::encode_language_selection pl]
 } -result a3083006ad040c02706c
 
 tcltest::test scapi-current-encode-2.2 {service selection event wire bytes} -body {
-    ::scapi_current::hex [::scapi_current::der_service_selection cardValidityCheck]
+    ::scapi::codec::hex [::scapi::codec::encode_service_selection cardValidityCheck]
 } -result a40730056e030a0112
 
 tcltest::test scapi-current-encode-2.3 {service none event wire bytes} -body {
-    ::scapi_current::hex [::scapi_current::der_service_selection none]
+    ::scapi::codec::hex [::scapi::codec::encode_service_selection none]
 } -result a40730056e030a0100
 
-tcltest::test scapi-current-encode-3.1 {amount entry event wire bytes} -setup {
-    set path .amount
-    array unset ::ntf::amount
-    array unset ::ntf::supplementary
-    array unset ::ntf::supplementary_amount
-    array unset ::ntf::cashback
-    set ::ntf::amount($path) 123
-} -body {
-    ::scapi_current::hex [::scapi_current::der_amount_entry $path]
-} -cleanup {
-    array unset ::ntf::amount
+tcltest::test scapi-current-encode-3.1 {amount entry event wire bytes} -body {
+    ::scapi::codec::hex [::scapi::codec::encode_amount_entry 123]
 } -result a8073005ec0302017b
 
-tcltest::test scapi-current-encode-3.2 {negative amount emits minus flag and absolute amount} -setup {
-    set path .amount
-    array unset ::ntf::amount
-    array unset ::ntf::supplementary
-    array unset ::ntf::cashback
-    set ::ntf::amount($path) -123
-} -body {
-    ::scapi_current::hex [::scapi_current::der_amount_entry $path]
-} -cleanup {
-    array unset ::ntf::amount
+tcltest::test scapi-current-encode-3.1-empty {empty amount entry event wire bytes} -body {
+    ::scapi::codec::hex [::scapi::codec::encode_amount_entry ""]
+} -result a8023000
+
+tcltest::test scapi-current-encode-3.2 {negative amount emits minus flag and absolute amount} -body {
+    ::scapi::codec::hex [::scapi::codec::encode_amount_entry -123]
 } -result a80c300af3030101ffec0302017b
 
-tcltest::test scapi-current-encode-3.3 {amount entry with cashback wire bytes} -setup {
-    set path .amount
-    array unset ::ntf::amount
-    array unset ::ntf::supplementary
-    array unset ::ntf::cashback
-    set ::ntf::amount($path) 123
-    set ::ntf::cashback($path) 45
-} -body {
-    ::scapi_current::hex [::scapi_current::der_amount_entry $path]
-} -cleanup {
-    array unset ::ntf::amount
-    array unset ::ntf::cashback
+tcltest::test scapi-current-encode-3.3 {amount entry with cashback wire bytes} -body {
+    ::scapi::codec::hex [::scapi::codec::encode_amount_entry 123 -cashback 45]
 } -result a80c300aec0302017b2e0302012d
 
-tcltest::test scapi-current-encode-3.4 {amount entry with confirmed supplementary amount wire bytes} -setup {
-    set path .amount
-    array unset ::ntf::amount
-    array unset ::ntf::supplementary
-    array unset ::ntf::cashback
-    set ::ntf::amount($path) 123
-    set ::ntf::supplementary($path) confirmed
-} -body {
-    ::scapi_current::hex [::scapi_current::der_amount_entry $path]
-} -cleanup {
-    array unset ::ntf::amount
-    array unset ::ntf::supplementary
+tcltest::test scapi-current-encode-3.4 {amount entry with confirmed supplementary amount wire bytes} -body {
+    ::scapi::codec::hex [::scapi::codec::encode_amount_entry 123 -supplementary confirmed]
 } -result a80c300aec0302017ba0030101ff
 
-tcltest::test scapi-current-encode-3.5 {amount entry with numeric supplementary amount wire bytes} -setup {
-    set path .amount
-    array unset ::ntf::amount
-    array unset ::ntf::supplementary
-    array unset ::ntf::cashback
-    set ::ntf::amount($path) 123
-    set ::ntf::supplementary($path) 17
-} -body {
-    ::scapi_current::hex [::scapi_current::der_amount_entry $path]
-} -cleanup {
-    array unset ::ntf::amount
-    array unset ::ntf::supplementary
+tcltest::test scapi-current-encode-3.5 {amount entry with numeric supplementary amount wire bytes} -body {
+    ::scapi::codec::hex [::scapi::codec::encode_amount_entry 123 -supplementary 17]
 } -result a80c300aec0302017b2f03020111
 
-tcltest::test scapi-current-encode-3.6 {current UI supplementary_amount array is ignored by encoder} -setup {
-    set path .amount
-    array unset ::ntf::amount
-    array unset ::ntf::supplementary
-    array unset ::ntf::supplementary_amount
-    set ::ntf::amount($path) 123
-    set ::ntf::supplementary_amount($path) 17
-} -body {
-    ::scapi_current::hex [::scapi_current::der_amount_entry $path]
-} -cleanup {
-    array unset ::ntf::amount
-    array unset ::ntf::supplementary_amount
+tcltest::test scapi-current-encode-3.6 {amount without supplementary matches current ignored UI field behavior} -body {
+    ::scapi::codec::hex [::scapi::codec::encode_amount_entry 123]
 } -result a8073005ec0302017b
 
 tcltest::test scapi-current-encode-4.1 {notification wrapper around one language event} -body {
-    set event [::scapi_current::der_language_selection pl]
-    ::scapi_current::hex [::scapi_current::der_notification $event]
+    set event [::scapi::codec::encode_language_selection pl]
+    ::scapi::codec::hex [::scapi::codec::encode_notification $event]
 } -result 3012a110300ea20c300aa3083006ad040c02706c
 
 tcltest::test scapi-current-encode-4.2 {notification wrapper preserves event order} -body {
-    set events [::scapi_current::der_language_selection pl]
-    append events [::scapi_current::der_service_selection cardValidityCheck]
-    ::scapi_current::hex [::scapi_current::der_notification $events]
+    set events [::scapi::codec::encode_language_selection pl]
+    append events [::scapi::codec::encode_service_selection cardValidityCheck]
+    ::scapi::codec::hex [::scapi::codec::encode_notification $events]
 } -result 301ba1193017a2153013a3083006ad040c02706ca40730056e030a0112
 
 tcltest::test scapi-current-decode-1.1 {registration request accepted shape} -body {
-    ::scapi_current::decode_registration_request 3004a0023000
+    ::scapi::codec::decode_registration_request [binary decode hex 3004a0023000]
 } -result {tag 0 class CONTEXT constructed 1 choice 0 length 0 remainder {}}
 
 tcltest::test scapi-current-decode-1.2 {notification request accepted shape} -body {
-    ::scapi_current::decode_notification_request 3004a1023000
+    ::scapi::codec::decode_notification_request [binary decode hex 3004a1023000]
 } -result {tag 1 class CONTEXT constructed 1 choice 1 length 0 remainder {}}
 
-tcltest::test scapi-current-decode-2.1 {output interaction request wire bytes} -body {
-    ::scapi_current::hex [::scapi_current::der_output_interaction_request pl 20]
-} -result 3011a20fa10d300b0c02706c3105a0030a0114
-
-tcltest::test scapi-current-decode-2.2 {output interaction request extracted fields} -body {
-    ::scapi_current::decode_output_interaction_request 3011a20fa10d300b0c02706c3105a0030a0114
+tcltest::test scapi-current-decode-2.1 {output interaction request extracted fields} -body {
+    ::scapi::codec::decode_output_interaction_request [binary decode hex 3011a20fa10d300b0c02706c3105a0030a0114]
 } -result {tag 2 class CONTEXT constructed 1 outer_choice 2 inner_choice 1 language pl what 0 message 20 req_remainder {} output_remainder {} what_remainder {}}
 
 tcltest::cleanupTests
