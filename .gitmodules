@@ -1,0 +1,6 @@
+[submodule "deps/protocol-specification"]
+	path = deps/protocol-specification
+	url = git@github.com:hurufu/nexoid-protocol-collection.git
+[submodule "deps/asn-tcl"]
+	path = deps/asn-tcl
+	url = git@github.com:hurufu/asn-tcl.git
