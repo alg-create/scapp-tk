@@ -2,6 +2,7 @@
 
 set app_dir [file dirname [file normalize [info script]]]
 lappend auto_path [file join $app_dir lib]
+lappend auto_path [file join $app_dir deps]
 
 package require tooltip
 package require msgcat

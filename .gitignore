@@ -57,3 +57,4 @@ dkms.conf
 
 # Temporary files
 deps/asn/
+deps/control/
