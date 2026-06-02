@@ -1,0 +1,23 @@
+::msgcat::mcmset fr {
+    none "Aucune"
+    payment "Vente"
+    refund "Rembourser"
+    cancellation "Annulation"
+    preauth "Pré-autorisation"
+    updatePreauth "Mettre à jour la pré-autorisation"
+    deferredPaymentCompletion "Achèvement du paiement différé"
+    voiceAuthorisation "Autorisation vocale"
+    cardholderDetection "Détection des titulaires de carte"
+    cardValidityCheck "Vérification de la validité de la carte"
+    noShow "Non-présentation"
+
+    crdhldrEmvApproved "Approuvée"
+    crdhldrEmvInsertCard "INSÉRER LA CARTE"
+    crdhldrEmvPleaseWait "S'il vous plaît attendez..."
+    crdhldrEmvUseMagStripe "UTILISER UNE BANDE MAGNÉTIQUE"
+    crdhldrMsgWelcome "Bienvenue"
+    crdhldrMsgSupplementaryAmountNotAllowed "Le montant supplémentaire n'est pas autorisé"
+    crdhldrMsgCashbackNotAllowed "Cashback non autorisé"
+    crdhldrMsgTransactionAborted "Transaction annulée"
+    crdhldrMsgReceiptPrintingFailed "L'impression du reçu a échoué!"
+}

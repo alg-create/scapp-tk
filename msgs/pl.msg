@@ -1,0 +1,23 @@
+::msgcat::mcmset pl {
+    none "Żaden"
+    payment "Sprzedaż"
+    refund "Zwrot"
+    cancellation "Unieważnienie"
+    preauth "Preautoryzacja"
+    updatePreauth "Zaktualizuj preautoryzację"
+    deferredPaymentCompletion "Zakończenie odroczonej płatności"
+    voiceAuthorisation "Autoryzacja głosowa"
+    cardholderDetection "Wykrywanie posiadacza karty"
+    cardValidityCheck "Sprawdzanie ważności karty"
+    noShow "Brak pokazu"
+
+    crdhldrEmvApproved "Zgoda."
+    crdhldrEmvInsertCard "WŁÓŻ KARTĘ"
+    crdhldrEmvPleaseWait "Proszę czekać..."
+    crdhldrEmvUseMagStripe "UŻYJ PASKA MAGNETYCZNEGO"
+    crdhldrMsgWelcome "Witamy"
+    crdhldrMsgSupplementaryAmountNotAllowed "Napiwek niedozwolony"
+    crdhldrMsgCashbackNotAllowed "Wypłata gotówki niedozwolona"
+    crdhldrMsgTransactionAborted "Transakcję przerwano"
+    crdhldrMsgReceiptPrintingFailed "Drukowanie paragonu nie powiodło się!"
+}

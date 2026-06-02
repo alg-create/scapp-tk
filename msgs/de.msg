@@ -1,0 +1,23 @@
+::msgcat::mcmset de {
+    none "Keiner"
+    payment "Verkauf"
+    refund "Rückerstattung"
+    cancellation "Stornierung"
+    preauth "Vorautorisierung"
+    updatePreauth "Vorautorisierung aktualisieren"
+    deferredPaymentCompletion "Abschluss der Zahlungsaufschub"
+    voiceAuthorisation "Sprachautorisierung"
+    cardholderDetection "Karteninhabererkennung"
+    cardValidityCheck "Überprüfung der Kartengültigkeit"
+    noShow "No-show"
+
+    crdhldrEmvApproved "Genehmigt"
+    crdhldrEmvInsertCard "KARTE EINFÜHREN"
+    crdhldrEmvPleaseWait "Warten Sie mal..."
+    crdhldrEmvUseMagStripe "MAGNETSTREIFEN VERWENDEN"
+    crdhldrMsgWelcome "Willkommen"
+    crdhldrMsgSupplementaryAmountNotAllowed "Ergänzungsbetrag ist nicht zulässig"
+    crdhldrMsgCashbackNotAllowed "Cashback nicht erlaubt"
+    crdhldrMsgTransactionAborted "Transaktion abgebrochen"
+    crdhldrMsgReceiptPrintingFailed "Belegdruck fehlgeschlagen!"
+}

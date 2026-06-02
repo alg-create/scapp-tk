@@ -1,0 +1,22 @@
+::msgcat::mcmset en {
+    none "None"
+    payment "Sale"
+    refund "Refund"
+    cancellation "Cancellation"
+    preauth "Pre-Authorisation"
+    updatePreauth "Update Pre-Auth."
+    voiceAuthorisation "Voice Auth."
+    cardholderDetection "Cardholder Detection"
+    cardValidityCheck "Card Validity Check"
+    noShow "No-show"
+
+    crdhldrEmvApproved "Approved."
+    crdhldrEmvInsertCard "INSERT CARD"
+    crdhldrEmvPleaseWait "Please Wait..."
+    crdhldrEmvUseMagStripe "USE MAG STRIPE"
+    crdhldrMsgWelcome "Welcome"
+    crdhldrMsgSupplementaryAmountNotAllowed "Supplementary amount isn't allowed"
+    crdhldrMsgCashbackNotAllowed "Cashback Not Allowed"
+    crdhldrMsgTransactionAborted "Transaction Aborted"
+    crdhldrMsgReceiptPrintingFailed "Receipt printing failed!"
+}
