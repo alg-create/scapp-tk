@@ -84,12 +84,8 @@ proc scapi::codec::read_response {sock} {
 }
 
 proc scapi::codec::tlv {tagClass constructed tagNumber value} {
-    set tagBytes [byte [expr {$tagClass + ($constructed ? 0x20 : 0x00) + $tagNumber}]]
+    set tagBytes [asn1::ber_encode_tag $tagClass [expr {$constructed ? 0x20 : 0x00}] $tagNumber]
     return $tagBytes[asn1::ber_encode_length [string length $value]]$value
-}
-
-proc scapi::codec::byte {value} {
-    return [binary format c [expr {(($value & 0xff) > 127) ? (($value & 0xff) - 256) : ($value & 0xff)}]]
 }
 
 proc scapi::codec::sequence {args} {
@@ -110,6 +106,10 @@ proc scapi::codec::context_constructed {tagNumber args} {
 
 proc scapi::codec::application_constructed {tagNumber value} {
     return [tlv 0x40 1 $tagNumber $value]
+}
+
+proc scapi::codec::private_constructed {tagNumber value} {
+    return [tlv 0xc0 1 $tagNumber $value]
 }
 
 proc scapi::codec::integer {value} {
@@ -150,7 +150,7 @@ proc scapi::codec::encode_service_selection {service} {
     if {![info exists service_to_num($service)]} {
         error "unknown service '$service'"
     }
-    return [context_constructed 4 [sequence [application_constructed 14 [enumeration $service_to_num($service)]]]]
+    return [context_constructed 4 [sequence [private_constructed 14 [enumeration $service_to_num($service)]]]]
 }
 
 proc scapi::codec::encode_amount_entry {amount args} {
@@ -164,11 +164,14 @@ proc scapi::codec::encode_amount_entry {amount args} {
 
     set fields ""
     if {$amount ne ""} {
+        set minus [expr {$amount < 0}]
         if {$amount < 0} {
             set amount [expr {abs($amount)}]
-            append fields [application_constructed 147 [boolean 1]]
         }
-        append fields [application_constructed 140 [integer $amount]]
+        append fields [context_constructed 140 [integer $amount]]
+        if {$minus} {
+            append fields [context_constructed 147 [boolean 1]]
+        }
     }
 
     set supplementary [dict get $options -supplementary]

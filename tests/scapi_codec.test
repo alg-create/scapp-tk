@@ -6,74 +6,74 @@ set root [file dirname $testdir]
 lappend auto_path [file join $root lib]
 package require scapi_codec 0.1.0
 
-tcltest::test scapi-current-encode-1.1 {ack response wire bytes} -body {
+tcltest::test scapi-codec-encode-1.1 {ack response wire bytes} -body {
     ::scapi::codec::hex [::scapi::codec::encode_ack]
 } -result 3006a204a1020500
 
-tcltest::test scapi-current-encode-1.2 {registration response wire bytes} -body {
+tcltest::test scapi-codec-encode-1.2 {registration response wire bytes} -body {
     ::scapi::codec::hex [::scapi::codec::encode_registration_response]
 } -result 3004a0023000
 
-tcltest::test scapi-current-encode-2.1 {language selection event wire bytes} -body {
+tcltest::test scapi-codec-encode-2.1 {language selection event wire bytes} -body {
     ::scapi::codec::hex [::scapi::codec::encode_language_selection pl]
 } -result a3083006ad040c02706c
 
-tcltest::test scapi-current-encode-2.2 {service selection event wire bytes} -body {
+tcltest::test scapi-codec-encode-2.2 {service selection event wire bytes} -body {
     ::scapi::codec::hex [::scapi::codec::encode_service_selection cardValidityCheck]
-} -result a40730056e030a0112
+} -result a4073005ee030a0112
 
-tcltest::test scapi-current-encode-2.3 {service none event wire bytes} -body {
+tcltest::test scapi-codec-encode-2.3 {service none event wire bytes} -body {
     ::scapi::codec::hex [::scapi::codec::encode_service_selection none]
-} -result a40730056e030a0100
+} -result a4073005ee030a0100
 
-tcltest::test scapi-current-encode-3.1 {amount entry event wire bytes} -body {
+tcltest::test scapi-codec-encode-3.1 {amount entry event wire bytes} -body {
     ::scapi::codec::hex [::scapi::codec::encode_amount_entry 123]
-} -result a8073005ec0302017b
+} -result a8093007bf810c0302017b
 
-tcltest::test scapi-current-encode-3.1-empty {empty amount entry event wire bytes} -body {
+tcltest::test scapi-codec-encode-3.1-empty {empty amount entry event wire bytes} -body {
     ::scapi::codec::hex [::scapi::codec::encode_amount_entry ""]
 } -result a8023000
 
-tcltest::test scapi-current-encode-3.2 {negative amount emits minus flag and absolute amount} -body {
+tcltest::test scapi-codec-encode-3.2 {negative amount emits minus flag and absolute amount} -body {
     ::scapi::codec::hex [::scapi::codec::encode_amount_entry -123]
-} -result a80c300af3030101ffec0302017b
+} -result a810300ebf810c0302017bbf8113030101ff
 
-tcltest::test scapi-current-encode-3.3 {amount entry with cashback wire bytes} -body {
+tcltest::test scapi-codec-encode-3.3 {amount entry with cashback wire bytes} -body {
     ::scapi::codec::hex [::scapi::codec::encode_amount_entry 123 -cashback 45]
-} -result a80c300aec0302017b2e0302012d
+} -result a810300ebf810c0302017bbf810e0302012d
 
-tcltest::test scapi-current-encode-3.4 {amount entry with confirmed supplementary amount wire bytes} -body {
+tcltest::test scapi-codec-encode-3.4 {amount entry with confirmed supplementary amount wire bytes} -body {
     ::scapi::codec::hex [::scapi::codec::encode_amount_entry 123 -supplementary confirmed]
-} -result a80c300aec0302017ba0030101ff
+} -result a80e300cbf810c0302017ba0030101ff
 
-tcltest::test scapi-current-encode-3.5 {amount entry with numeric supplementary amount wire bytes} -body {
+tcltest::test scapi-codec-encode-3.5 {amount entry with numeric supplementary amount wire bytes} -body {
     ::scapi::codec::hex [::scapi::codec::encode_amount_entry 123 -supplementary 17]
-} -result a80c300aec0302017b2f03020111
+} -result a810300ebf810c0302017bbf810f03020111
 
-tcltest::test scapi-current-encode-3.6 {amount without supplementary matches current ignored UI field behavior} -body {
+tcltest::test scapi-codec-encode-3.6 {amount without supplementary amount wire bytes} -body {
     ::scapi::codec::hex [::scapi::codec::encode_amount_entry 123]
-} -result a8073005ec0302017b
+} -result a8093007bf810c0302017b
 
-tcltest::test scapi-current-encode-4.1 {notification wrapper around one language event} -body {
+tcltest::test scapi-codec-encode-4.1 {notification wrapper around one language event} -body {
     set event [::scapi::codec::encode_language_selection pl]
     ::scapi::codec::hex [::scapi::codec::encode_notification $event]
 } -result 3012a110300ea20c300aa3083006ad040c02706c
 
-tcltest::test scapi-current-encode-4.2 {notification wrapper preserves event order} -body {
+tcltest::test scapi-codec-encode-4.2 {notification wrapper preserves event order} -body {
     set events [::scapi::codec::encode_language_selection pl]
     append events [::scapi::codec::encode_service_selection cardValidityCheck]
     ::scapi::codec::hex [::scapi::codec::encode_notification $events]
-} -result 301ba1193017a2153013a3083006ad040c02706ca40730056e030a0112
+} -result 301ba1193017a2153013a3083006ad040c02706ca4073005ee030a0112
 
-tcltest::test scapi-current-decode-1.1 {registration request accepted shape} -body {
+tcltest::test scapi-codec-decode-1.1 {registration request accepted shape} -body {
     ::scapi::codec::decode_registration_request [binary decode hex 3004a0023000]
 } -result {tag 0 class CONTEXT constructed 1 choice 0 length 0 remainder {}}
 
-tcltest::test scapi-current-decode-1.2 {notification request accepted shape} -body {
+tcltest::test scapi-codec-decode-1.2 {notification request accepted shape} -body {
     ::scapi::codec::decode_notification_request [binary decode hex 3004a1023000]
 } -result {tag 1 class CONTEXT constructed 1 choice 1 length 0 remainder {}}
 
-tcltest::test scapi-current-decode-2.1 {output interaction request extracted fields} -body {
+tcltest::test scapi-codec-decode-2.1 {output interaction request extracted fields} -body {
     ::scapi::codec::decode_output_interaction_request [binary decode hex 3011a20fa10d300b0c02706c3105a0030a0114]
 } -result {tag 2 class CONTEXT constructed 1 outer_choice 2 inner_choice 1 language pl what 0 message 20 req_remainder {} output_remainder {} what_remainder {}}
 

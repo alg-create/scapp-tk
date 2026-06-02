@@ -267,8 +267,8 @@ proc rpc::der_amount_entry {path} {
     } else {
         set amount ""
     }
-    if {[info exists ntf::supplementary($path)]} {
-        lappend options -supplementary $ntf::supplementary($path)
+    if {[info exists ntf::supplementary_amount($path)] && [string trim $ntf::supplementary_amount($path)] ne ""} {
+        lappend options -supplementary $ntf::supplementary_amount($path)
     }
     if {[info exists ntf::cashback($path)]} {
         lappend options -cashback $ntf::cashback($path)
