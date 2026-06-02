@@ -26,6 +26,8 @@ namespace import control::assert
 ##nagelfar syntax asnGetLength n v
 ##nagelfar syntax asnSequence x x*
 ##nagelfar syntax asnEnumeration x
+##nagelfar syntax asnInteger x
+##nagelfar syntax asnBoolean x
 ##nagelfar syntax asnChoiceConstr x x
 ##nagelfar syntax asnChoice x x
 ##nagelfar syntax asnContext x x
@@ -125,6 +127,9 @@ array set scap_num_to_msg {
 }
 
 namespace eval ntf {
+    array set amount {}
+    array set supplementary_amount {}
+    array set cashback {}
 }
 
 namespace eval rpc {
@@ -288,6 +293,30 @@ proc rpc::der_service_selection {service} {
     return [asnChoiceConstr 4 [asnSequence [asnApplicationConstr 14 [asnEnumeration $::service_to_num($service)]]]]
 }
 
+# FIXME: Don't depend on global variables
+proc rpc::der_amount_entry {path} {
+    set amounts {}
+    if {[info exists ntf::amount($path)]} {
+        set amount $ntf::amount($path)
+        if {$amount < 0} {
+            set amount [expr {abs($amount)}]
+            append amounts [asnApplicationConstr 147 [asnBoolean 1]]
+        }
+        append amounts [asnApplicationConstr 140 [asnInteger $amount]]
+    }
+    if {[info exists ntf::supplementary($path)]} {
+        if {$ntf::supplementary($path) eq "confirmed"} {
+            append amounts [asnContextConstr 0 [asnBoolean 1]]
+        } else {
+            append amounts [asnContextConstr 143 [asnInteger $ntf::supplementary($path)]]
+        }
+    }
+    if {[info exists ntf::cashback($path)]} {
+        append amounts [asnContextConstr 142 [asnInteger $ntf::cashback($path)]]
+    }
+    return [asnChoiceConstr 8 [asnSequence $amounts]]
+}
+
 proc rpc::der_notification {events} {
     return [asnSequence [asnChoiceConstr 1 [asnSequence [asnContextConstr 2 [asnSequence $events]]]]]
 }
@@ -393,6 +422,9 @@ proc ui::build_amount_entry {path} {
     ui::build_amount $path trx "Amount" 0
     ui::build_amount $path supp "Supplementary (tip/gratuity)" 1
     ui::build_amount $path cash "Cashback" 1
+    $path.trx-amount configure -textvariable ntf::amount($path)
+    $path.supp-amount configure -textvariable ntf::supplementary_amount($path)
+    $path.cash-amount configure -textvariable ntf::cashback($path)
     return $path
 }
 
@@ -591,6 +623,9 @@ proc send_pending_events {sock} {
         if {[info exists ntf::selected_service($path)]} {
             append events [rpc::der_service_selection $ntf::selected_service($path)]
         }
+        if {[info exists ntf::amount($path)]} {
+            append events [rpc::der_amount_entry $path]
+        }
         foreach prefix {trx supp cash} {
             set w $path.$prefix-amount
             if {[winfo exists $w]} {
@@ -598,7 +633,7 @@ proc send_pending_events {sock} {
             }
         }
     }
-    ${log}::debug "Will send [binary encode hex $events] to $sock"
+    ${log}::debug "Will send \[hex [binary encode hex $events]\] to $sock"
     fileevent $sock readable [list rpc::handle_request $sock]
     puts -nonewline $sock [rpc::der_notification $events]
     return 1
