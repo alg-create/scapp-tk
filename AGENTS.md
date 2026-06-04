@@ -1,5 +1,10 @@
 # Agent Instructions
 
+## Git Hooks
+
+The Git hooks for this repository (such as the `prepare-commit-msg` hook) should be taken from:
+https://github.com/alg-create/agentic-git-hooks
+
 ## AI-Developed Patches
 
 When a patch is fully developed by an AI assistant, create the Git hook sentinel file before the user commits:
