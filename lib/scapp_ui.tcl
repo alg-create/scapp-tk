@@ -77,8 +77,17 @@ proc ui::reset_state {} {
 
 proc ui::configure_styles {} {
     #ttk::style theme use clam
-    ttk::style configure Close.Toolbutton -foreground #cc0000 -padding 1
+    if {$::tcl_platform(platform) eq "windows"} {
+        font create SymbolFont -family "Segoe UI Symbol" -size 9
+        font create CloseSymbolFont -family "Segoe UI Symbol" -size 9 -weight bold
+    } else {
+        font create SymbolFont -family "Helvetica" -size 9
+        font create CloseSymbolFont -family "Helvetica" -size 9 -weight bold
+    }
+
+    ttk::style configure Close.Toolbutton -foreground #cc0000 -padding 1 -font CloseSymbolFont
     ttk::style map Close.Toolbutton -foreground {active #ff0000}
+    ttk::style configure Symbol.TButton -font SymbolFont -padding 4
     ttk::style configure TLabel -padding 4
     ttk::style configure TButton -padding 4
     ttk::style map TEntry -fieldbackground {invalid #ffdddd}
@@ -365,7 +374,7 @@ proc ui::build {send_command} {
     ui::configure_styles
 
     set menubar [ttk::frame .top]
-    set hamburger [ttk::button $menubar.hamburger -text "\u2630" -width 2]
+    set hamburger [ttk::button $menubar.hamburger -text "\u2630" -width 2 -style Symbol.TButton]
     set main [ttk::panedwindow .p -orient horizontal]
     set left  [ttk::frame $main.l]
     set right [ttk::frame $main.r]
@@ -374,7 +383,7 @@ proc ui::build {send_command} {
     $main add $right -weight 1
 
     ttk::label $left.lbl -text "Notification"
-    ttk::button $left.clear -text "Clear \u239a" -command ui::remove_all_flashcards
+    ttk::button $left.clear -text "Clear \u239a" -style Symbol.TButton -command ui::remove_all_flashcards
 
     ttk::frame $left.f -relief sunken -borderwidth 2
     set vscroll [ttk::scrollbar $left.f.vscroll -orient vertical -command "$left.f.c yview"]
@@ -388,9 +397,9 @@ proc ui::build {send_command} {
         ui::update_scrollable_area .p.l.f.c
     }
 
-    ttk::button $left.send -text "Send \u21e8" -command [list ui::invoke_send $send_command]
+    ttk::button $left.send -text "Send \u21e8" -style Symbol.TButton -command [list ui::invoke_send $send_command]
     ttk::combobox $left.event_selector -values [array names evts] -state readonly -textvariable ui::selected_event
-    ttk::button $left.push -text "Add \u21e9" -command {
+    ttk::button $left.push -text "Add \u21e9" -style Symbol.TButton -command {
         grid [$ui::evts($ui::selected_event) [ui::build_flashcard .p.l.f.c.events $ui::selected_event]]
     }
 
